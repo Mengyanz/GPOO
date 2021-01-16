@@ -73,9 +73,10 @@ class GPRegression_Group(GP):
             this method yourself, there may be unexpected consequences.
         """
         print('GPRG trigger parameters changed.')
-        self.posterior, self._log_marginal_likelihood, self.grad_dict = self.inference_method.inference(self.kern, self.X, self.likelihood, self.Y_normalized, self.mean_function, self.Y_metadata, self.A)
+        self.posterior, self._log_marginal_likelihood, self.grad_dict = self.inference_method.inference(self.kern, self.X, self.likelihood, self.Y_normalized, self.mean_function, self.Y_metadata, A = self.A)
         # REVIEW: whether we need to change likelihood (Gaussian), kern, mean_function class?
         self.likelihood.update_gradients(self.grad_dict['dL_dthetaL'])
+        # FIXME: gradient need change!
         self.kern.update_gradients_full(self.grad_dict['dL_dK'], self.X)
         if self.mean_function is not None:
             self.mean_function.update_gradients(self.grad_dict['dL_dm'], self.X)

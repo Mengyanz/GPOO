@@ -47,7 +47,10 @@ class ExactGaussianInferenceGroup(ExactGaussianInference):
             log_marginal += Z_tilde
 
         # REVIEW: since log_marginal does not change, the gradient does not need to change as well.
-        dL_dK = 0.5 * (tdot(alpha) - Y.shape[1] * Wi)
+        # FIXME: confirm the gradient update is correct
+        # dL_dK = 0.5 * (tdot(alpha) - Y.shape[1] * Wi)
+        dL_dK = 0.5 * A.T.dot((tdot(alpha) - Y.shape[1] * Wi)).dot(A)
+        print('dL_dK shape', dL_dK.shape)
 
         dL_dthetaL = likelihood.exact_inference_gradients(np.diag(dL_dK), Y_metadata)
 
