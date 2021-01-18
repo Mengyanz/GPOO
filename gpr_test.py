@@ -2,17 +2,27 @@ import GPy
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
-import matplotlib
+import matplotlib.pyplot as plt
 
 # GPy.plotting.change_plotting_library('plotly')
 
 # 1d model
 
-np.random.seed(0)
-X = np.random.uniform(-3.,3.,(50,1))
-Y = np.sin(X) + np.random.randn(50,1)*0.05
-X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.2, random_state = 0)
+# np.random.seed(0)
+# X = np.random.uniform(-3.,3.,(50,1))
+# Y = np.sin(X) + np.random.randn(50,1)*0.05
+# X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.2, random_state = 0)
 
+num_train = 30
+num_test = 100
+
+np.random.seed(1996)
+X_train = np.random.uniform(-3.,3.,(num_train,1))
+f_train = np.sin(X_train)
+Y_train = f_train + np.random.randn(num_train,1)*0.05
+X_test = np.random.uniform(-3.5,3.5,(num_test,1))
+f_test = np.sin(X_test)
+Y_test = f_test + np.random.randn(num_test,1)*0.05
 
 kernel = GPy.kern.RBF(input_dim=1, variance=1., lengthscale=1.)
 
@@ -33,3 +43,25 @@ print('r2 score: ', r2_score_test)
 # fig['gpmean'][0].savefig('gpr_test.png')
 # GPy.plotting.show(fig, filename='basic_gp_regression_density_optimized_test')
 # matplotlib.pylab.show(block=True) 
+
+# plt.plot(X_train, Y_train, '.', label = 'train')
+# plt.plot(Y_test, Y_test, '.', label = 'test')
+# plt.plot(Y_test, Y_test_pred, '.', label = 'pred')
+# plt.legend()
+# plt.show()
+
+sorted_train_idx = np.argsort(X_train, axis = 0).reshape(X_train.shape[0],)
+sorted_test_idx = np.argsort(X_test, axis = 0).reshape(X_test.shape[0],)
+
+plt.plot(X_train[sorted_train_idx,:], Y_train[sorted_train_idx,:], '.',label = 'train')
+plt.plot(X_test[sorted_test_idx,:], f_test[sorted_test_idx,:], label = 'test')
+plt.plot(X_test[sorted_test_idx,:], Y_test_pred[sorted_test_idx,:], label = 'pred')
+plt.fill_between(X_test[sorted_test_idx,:].reshape(X_test.shape[0],), 
+            (Y_test_pred[sorted_test_idx,:] - 2 * np.sqrt(Y_test_var[sorted_test_idx,:])).reshape(X_test.shape[0],),
+            (Y_test_pred[sorted_test_idx,:] + 2 * np.sqrt(Y_test_var[sorted_test_idx,:])).reshape(X_test.shape[0],), alpha = 0.5)
+plt.legend()
+info = '_train_' + str(num_train) 
+plt.title('gpr' + info)
+plt.xlabel('X')
+plt.ylabel('Y')
+plt.savefig('gpr' + info + '.png')
