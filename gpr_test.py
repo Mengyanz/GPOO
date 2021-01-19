@@ -3,6 +3,8 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt
+from generate_data import generate_data_func
+from plot import plot_1d, plot_2d
 
 # GPy.plotting.change_plotting_library('plotly')
 
@@ -15,16 +17,12 @@ import matplotlib.pyplot as plt
 
 num_train = 30
 num_test = 100
+dim = 2
 
-np.random.seed(1996)
-X_train = np.random.uniform(-3.,3.,(num_train,1))
-f_train = np.sin(X_train)
-Y_train = f_train + np.random.randn(num_train,1)*0.05
-X_test = np.random.uniform(-3.5,3.5,(num_test,1))
-f_test = np.sin(X_test)
-Y_test = f_test + np.random.randn(num_test,1)*0.05
+X_train, f_train, Y_train, X_test, f_test, Y_test = generate_data_func(num_train,num_test,dim=dim)
 
-kernel = GPy.kern.RBF(input_dim=1, variance=1., lengthscale=1.)
+kernel = GPy.kern.RBF(input_dim=dim, variance=1., lengthscale=1.)
+# kernel = GPy.kern.Matern52(dim,ARD=True) + GPy.kern.White(dim)
 
 m = GPy.models.GPRegression(X_train,Y_train,kernel)
 m.optimize(messages=False)
@@ -50,18 +48,23 @@ print('r2 score: ', r2_score_test)
 # plt.legend()
 # plt.show()
 
-sorted_train_idx = np.argsort(X_train, axis = 0).reshape(X_train.shape[0],)
-sorted_test_idx = np.argsort(X_test, axis = 0).reshape(X_test.shape[0],)
+# sorted_train_idx = np.argsort(X_train, axis = 0).reshape(X_train.shape[0],)
+# sorted_test_idx = np.argsort(X_test, axis = 0).reshape(X_test.shape[0],)
 
-plt.plot(X_train[sorted_train_idx,:], Y_train[sorted_train_idx,:], '.',label = 'train')
-plt.plot(X_test[sorted_test_idx,:], f_test[sorted_test_idx,:], label = 'test')
-plt.plot(X_test[sorted_test_idx,:], Y_test_pred[sorted_test_idx,:], label = 'pred')
-plt.fill_between(X_test[sorted_test_idx,:].reshape(X_test.shape[0],), 
-            (Y_test_pred[sorted_test_idx,:] - 2 * np.sqrt(Y_test_var[sorted_test_idx,:])).reshape(X_test.shape[0],),
-            (Y_test_pred[sorted_test_idx,:] + 2 * np.sqrt(Y_test_var[sorted_test_idx,:])).reshape(X_test.shape[0],), alpha = 0.5)
-plt.legend()
-info = '_train_' + str(num_train) 
-plt.title('gpr' + info)
-plt.xlabel('X')
-plt.ylabel('Y')
-plt.savefig('gpr' + info + '.png')
+# plt.plot(X_train[sorted_train_idx,:], Y_train[sorted_train_idx,:], '.',label = 'train')
+# plt.plot(X_test[sorted_test_idx,:], f_test[sorted_test_idx,:], label = 'test')
+# plt.plot(X_test[sorted_test_idx,:], Y_test_pred[sorted_test_idx,:], label = 'pred')
+# plt.fill_between(X_test[sorted_test_idx,:].reshape(X_test.shape[0],), 
+#             (Y_test_pred[sorted_test_idx,:] - 2 * np.sqrt(Y_test_var[sorted_test_idx,:])).reshape(X_test.shape[0],),
+#             (Y_test_pred[sorted_test_idx,:] + 2 * np.sqrt(Y_test_var[sorted_test_idx,:])).reshape(X_test.shape[0],), alpha = 0.5)
+# plt.legend()
+# info = '_train_' + str(num_train) 
+# plt.title('gpr' + info)
+# plt.xlabel('X')
+# plt.ylabel('Y')
+# plt.savefig('gpr' + info + '.png')
+
+if dim == 1:
+    plot_1d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, 'gpr')
+if dim == 2:
+    plot_2d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, 'gpr')
