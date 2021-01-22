@@ -17,15 +17,15 @@ from plot import plot_1d, plot_2d
 
 num_train = 30
 num_test = 100
-dim = 2
+dim = 1
 
 X_train, f_train, Y_train, X_test, f_test, Y_test = generate_data_func(num_train,num_test,dim=dim)
 
 kernel = GPy.kern.RBF(input_dim=dim, variance=1., lengthscale=1.)
 # kernel = GPy.kern.Matern52(dim,ARD=True) + GPy.kern.White(dim)
 
-m = GPy.models.GPRegression(X_train,Y_train,kernel)
-m.optimize(messages=False)
+m = GPy.models.GPRegression(X_train,Y_train,kernel, noise_var=0.005)
+# m.optimize(messages=False)
 
 Y_test_pred, Y_test_var = m.predict(X_test)
 print('test label: ', Y_test)
@@ -65,6 +65,6 @@ print('r2 score: ', r2_score_test)
 # plt.savefig('gpr' + info + '.png')
 
 if dim == 1:
-    plot_1d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, 'gpr')
+    plot_1d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, None, 'gpr')
 if dim == 2:
     plot_2d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, 'gpr')
