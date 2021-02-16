@@ -20,11 +20,12 @@ def plot_1d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_te
     sorted_train_idx = np.argsort(X_train, axis = 0).reshape(X_train.shape[0],)
     sorted_test_idx = np.argsort(X_test, axis = 0).reshape(X_test.shape[0],)
 
-    print('test label: ', Y_test[sorted_test_idx])
-    print('test pred: ', Y_test_pred[sorted_test_idx])
-    print('test std: ', np.sqrt(Y_test_var[sorted_test_idx]))
+    # print('test label: ', Y_test[sorted_test_idx])
+    # print('test pred: ', Y_test_pred[sorted_test_idx])
+    # print('test std: ', np.sqrt(Y_test_var[sorted_test_idx]))
 
-    if A is None:
+    # if A is None:
+    if True:
         plt.plot(X_train[sorted_train_idx,:], Y_train[sorted_train_idx,:], '.', color = 'tab:green', label = 'train')
     else:
         # plt.plot(X_train[sorted_train_idx,:], Y_train[sorted_train_idx,:], '.', color = 'tab:green', label = 'train')
@@ -44,7 +45,7 @@ def plot_1d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_te
     else:
         print('unknown model name!')
         info = 'None'
-    
+    plt.ylim(-1.7, 1.2)
     plt.title(info)
     plt.xlabel('X')
     plt.ylabel('Y')

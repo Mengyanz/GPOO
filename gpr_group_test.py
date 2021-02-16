@@ -31,8 +31,12 @@ num_group = 5
 num_element_in_group = int(num_train/num_group)
 dim = 1
 
-# grouping choices: random, bins, evenly
-grouping_method = 'bins' 
+# grouping choices: random, bins, evenly, ortho, tridiagonal, spd
+grouping_method = 'spd'
+
+if grouping_method in {'ortho', 'tridiagonal', 'spd'}:
+    num_group = num_train
+    print('Set the number of group as the same size of training samples.')
 
 # np.random.seed(1996)
 # X_train = np.random.uniform(-3.,3.,(num_train,1))
@@ -77,6 +81,22 @@ elif grouping_method == 'evenly':
             group_idx +=1 
         else:
             group_idx = 0
+elif grouping_method == 'tridiagonal':
+    from scipy.sparse import diags
+    A = diags([1, 1], [-1, 1], shape=(num_group, num_train)).toarray()
+    assert np.linalg.matrix_rank(A) == num_train
+    assert np.linalg.matrix_rank(A) == num_train
+    print(A)
+elif grouping_method == 'ortho':
+    from scipy.stats import ortho_group
+    A = ortho_group.rvs(num_train)
+    assert np.linalg.matrix_rank(A) == num_train
+    print(A)
+elif grouping_method == 'spd':
+    from sklearn.datasets import make_spd_matrix
+    A = make_spd_matrix(num_train)
+    assert np.linalg.matrix_rank(A) == num_train
+    print(A)
 else:
     print('invalid grouping method!')
 
