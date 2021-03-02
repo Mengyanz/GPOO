@@ -25,7 +25,7 @@ def plot_1d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_te
     # print('test std: ', np.sqrt(Y_test_var[sorted_test_idx]))
 
     # if A is None:
-    if True:
+    if A is None:
         plt.plot(X_train[sorted_train_idx,:], Y_train[sorted_train_idx,:], '.', color = 'tab:green', label = 'train')
     else:
         # plt.plot(X_train[sorted_train_idx,:], Y_train[sorted_train_idx,:], '.', color = 'tab:green', label = 'train')
@@ -45,7 +45,7 @@ def plot_1d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_te
     else:
         print('unknown model name!')
         info = 'None'
-    plt.ylim(-1.7, 1.2)
+    # plt.ylim(-1.7, 1.2)
     plt.title(info)
     plt.xlabel('X')
     plt.ylabel('Y')

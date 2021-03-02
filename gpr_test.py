@@ -15,11 +15,11 @@ from plot import plot_1d, plot_2d
 # Y = np.sin(X) + np.random.randn(50,1)*0.05
 # X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.2, random_state = 0)
 
-num_train = 30
+num_train = 15
 num_test = 100
 dim = 1
 
-X_train, f_train, Y_train, X_test, f_test, Y_test = generate_data_func(num_train,num_test,dim=dim)
+X_train, f_train, Y_train, X_test, f_test, Y_test = generate_data_func(num_train,num_test,dim=dim, func_type='linear')
 
 kernel = GPy.kern.RBF(input_dim=dim, variance=1., lengthscale=1.)
 # kernel = GPy.kern.Matern52(dim,ARD=True) + GPy.kern.White(dim)
