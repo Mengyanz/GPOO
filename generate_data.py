@@ -40,9 +40,9 @@ def generate_data_func(num_train = 40, num_test = 100, dim = 1, func_type = 'sin
         Y_test = f_test + np.random.randn(num_test,1)*0.05
     elif dim == 2:
         f_train = np.sin(X_train[:,0:1]) * np.sin(X_train[:,1:2])
-        Y_train = f_train + np.random.randn(num_train,1)*0.05
+        Y_train = f_train # + np.random.randn(num_train,1)*0.05
         f_test = np.sin(X_test[:,0:1]) * np.sin(X_test[:,1:2])
-        Y_test = f_test + np.random.randn(num_test,1)*0.05
+        Y_test = f_test # + np.random.randn(num_test,1)*0.05
     else:
         print('Invalid dim!')
         f_train = None

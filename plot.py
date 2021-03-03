@@ -5,7 +5,7 @@ import matplotlib.tri as tri
 from matplotlib.cm import ScalarMappable as sm
 import numpy as np
 
-x_shift = 20
+x_shift = 0
 
 X_train_range_low = -3. + x_shift
 X_train_range_high = 3. + x_shift
@@ -57,7 +57,7 @@ def plot_2d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_te
 
     num_train = X_train.shape[0]
 
-    fig, (ax1, ax2, ax3) = plt.subplots(figsize = (20,10), ncols=3)
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(figsize = (30,10), ncols=4)
 
     if model_name == 'gprg':
         info = model_name + '_train_' + str(num_train) + '_group_' + str(num_group) + '_' + str(grouping_method)
@@ -113,7 +113,11 @@ def plot_2d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_te
 
     ax1.contour(xi, yi, zi1, levels=levels, linewidths=0.5, colors='k')
     cntr1 = ax1.contourf(xi, yi, zi1, levels=levels, cmap="RdBu_r")
-    ax1.plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
+    if A is None:
+        ax1.plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
+    else:
+        for i in range(A.shape[0]):
+            ax1.plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1], 'o', ms = 3)
     # if A is None:
     #     ax1.plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
     # else:
@@ -139,7 +143,11 @@ def plot_2d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_te
 
     ax2.contour(xi, yi, zi2, levels=levels, linewidths=0.5, colors='k')
     cntr2 = ax2.contourf(xi, yi, zi2, levels=levels, cmap="RdBu_r")
-    ax2.plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
+    if A is None:
+        ax2.plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
+    else:
+        for i in range(A.shape[0]):
+            ax2.plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1], 'o', ms = 3)
     ax2.set_xlabel('X[:,0]')
     ax2.set_ylabel('X[:,1]')
     ax2.set_title(info + ' (pred ucb - true mean)')
@@ -156,11 +164,33 @@ def plot_2d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_te
 
     ax3.contour(xi, yi, zi3, levels=levels, linewidths=0.5, colors='k')
     cntr3 = ax3.contourf(xi, yi, zi3, levels=levels, cmap="RdBu_r")
-    ax3.plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
+    if A is None:
+        ax3.plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
+    else:
+        for i in range(A.shape[0]):
+            ax3.plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1], 'o', ms = 3)
     ax3.set_xlabel('X[:,0]')
     ax3.set_ylabel('X[:,1]')
     ax3.set_title(info + ' (true mean - pred lcb)')
     plt.colorbar(cntr3, ax=ax3)
+
+    # --------------------------------------------------------------
+    # subplot 4: pred var
+
+    interpolator4= tri.LinearTriInterpolator(triang, z_test_pred_var)
+    zi4 = interpolator4(Xi, Yi)
+
+    ax4.contour(xi, yi, zi4, levels=levels, linewidths=0.5, colors='k')
+    cntr4 = ax4.contourf(xi, yi, zi4, levels=levels, cmap="RdBu_r")
+    if A is None:
+        ax4.plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
+    else:
+        for i in range(A.shape[0]):
+            ax4.plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1], 'o', ms = 3)
+    ax4.set_xlabel('X[:,0]')
+    ax4.set_ylabel('X[:,1]')
+    ax4.set_title(info + ' pred var')
+    plt.colorbar(cntr4, ax=ax4)
 
 
     # plt.contour(X_train[:,0], X_train[:,1], Y_train,label = 'train')

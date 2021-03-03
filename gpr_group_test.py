@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from gpr_group_model import GPRegression_Group
 from generate_data import generate_data_func
 from plot import plot_1d, plot_2d
+from sklearn.cluster import KMeans
 
 x_shift = 0
 
@@ -23,13 +24,13 @@ X_test_range_high = 3.5 + x_shift
 # Y = np.sin(X) + np.random.randn(50,1)*0.05
 # X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.2, random_state = 4)
 
-num_train = 15
+num_train = 30
 num_test = 100
 # num_train = X_train.shape[0]
 # TODO: for now, assume num_train/num_group is integer
 num_group = 5
 num_element_in_group = int(num_train/num_group)
-dim = 1
+dim = 2
 
 # np.random.seed(1996)
 # X_train = np.random.uniform(-3.,3.,(num_train,1))
@@ -39,7 +40,7 @@ dim = 1
 # f_test = np.sin(X_test)
 # Y_test = f_test + np.random.randn(num_test,1)*0.05
 
-X_train, f_train, Y_train, X_test, f_test, Y_test = generate_data_func(num_train,num_test,dim=dim, func_type='linear')
+X_train, f_train, Y_train, X_test, f_test, Y_test = generate_data_func(num_train,num_test,dim=dim, func_type='sin')
 
 # Generate group matrix A (10 * n_train) and group label Y_group (10 * 1)
 
@@ -61,17 +62,22 @@ def generate_A(grouping_method, num_group = 30):
             idx_set -=set(select_ele)
     elif grouping_method == 'bins':
         # Method 2 -> form group: bins
-        # TODO: do not work for 2d yet
-        bins = np.linspace(X_train_range_low, X_train_range_high, num_group+1)
-        print(bins)
-        digitized = np.digitize(X_train, bins)
-        # print(digitized)
-        for i in range(num_group):
-            # print(i)
-            # print(X_train[digitized == i])
-            # print('size: ', len(X_train[digitized == i]))
-            idx = np.asarray(digitized == i+1).reshape(X_train.shape[0],)
-            A[i, idx] = 1
+        if dim == 1:
+            bins = np.linspace(X_train_range_low, X_train_range_high, num_group+1)
+            print(bins)
+            digitized = np.digitize(X_train, bins)
+            # print(digitized)
+            for i in range(num_group):
+                # print(i)
+                # print(X_train[digitized == i])
+                # print('size: ', len(X_train[digitized == i]))
+                idx = np.asarray(digitized == i+1).reshape(X_train.shape[0],)
+                A[i, idx] = 1
+        elif dim == 2:
+            kmeans = KMeans(n_clusters=num_group, init = 'k-means++', random_state= 0).fit(X_train)
+            group_idx = kmeans.labels_
+            for idx,i in enumerate(group_idx):
+                A[i, idx] = 1
     elif grouping_method == 'evenly':
         group_idx = 0
         sorted_train_idx = np.argsort(X_train, axis = 0).reshape(X_train.shape[0],)
@@ -111,6 +117,7 @@ def run_gprg(A):
     # Y_group = A.dot(Y_train)
 
     kernel = GPy.kern.RBF(input_dim=dim, variance=1., lengthscale=1.)
+    # kernel = GPy.kern.Poly(input_dim=dim, variance=1., scale=1., order = 1)
 
     m = GPRegression_Group(X_train,Y_group,kernel, noise_var=0.005, A = A)
     # m.optimize(messages=False,max_f_eval = 1000)
