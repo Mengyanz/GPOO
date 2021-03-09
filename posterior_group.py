@@ -11,10 +11,11 @@ class PosteriorExactGroup(PosteriorExact):
         self.A = A
         
 
-    def _raw_predict(self, kern, Xnew, pred_var, full_cov=False):
+    def _raw_predict(self, kern, Xnew, A_ast, pred_var, full_cov=False):
         print('PosteriorExactGroup _raw_predict')
         # NOTE: change Kx to AKx
-        Kx = self.A.dot(kern.K(pred_var, Xnew))
+        # NOTE: add .dot(A_ast.T)
+        Kx = self.A.dot(kern.K(pred_var, Xnew)).dot(A_ast.T)
         mu = np.dot(Kx.T, self.woodbury_vector)
         if len(mu.shape) == 1:
             mu = mu.reshape(-1, 1)
@@ -30,7 +31,7 @@ class PosteriorExactGroup(PosteriorExact):
                     var[:, :, i] = (Kxx - tdot(tmp.T))
             var = var
         else:
-            Kxx = kern.Kdiag(Xnew)
+            Kxx = np.diag(A_ast.dot(kern.K(Xnew, Xnew)).dot(A_ast.T))
             if self._woodbury_chol.ndim == 2:
                 tmp = dtrtrs(self._woodbury_chol, Kx)[0]
                 var = (Kxx - np.square(tmp).sum(0))[:, None]

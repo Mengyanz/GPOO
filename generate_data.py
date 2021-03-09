@@ -11,21 +11,27 @@ from sklearn.model_selection import train_test_split
 np.random.seed(1996)
 # np.random.seed(0)
 
-x_shift = 0
+# x_shift = 0
 
-X_train_range_low = -3. + x_shift
-X_train_range_high = 3. + x_shift
-X_test_range_low = -3.5 + x_shift
-X_test_range_high = 3.5 + x_shift
+# X_train_range_low = -3. + x_shift
+# X_train_range_high = 3. + x_shift
+# X_test_range_low = -3.5 + x_shift
+# X_test_range_high = 3.5 + x_shift
+
+# X_train_range_low = -10. + x_shift
+# X_train_range_high = 10. + x_shift
+# X_test_range_low = -10.5 + x_shift
+# X_test_range_high = 10.5 + x_shift
 
 
-def generate_data_func(num_train = 40, num_test = 100, dim = 1, func_type = 'sin'):
+def generate_data_func(num_train = 40, num_test = 100, dim = 1, func_type = 'sin', X_train_range_low = -3., X_train_range_high = 3., x_shift = 0):
 
     num_train = num_train
     num_test = num_test
 
-    X_train = np.random.uniform(X_train_range_low, X_train_range_high,(num_train,dim))
-    X_test = np.random.uniform(X_test_range_low, X_test_range_high,(num_test,dim))
+    # uniformly discretize the continuous space
+    X_train = np.random.uniform(X_train_range_low + x_shift, X_train_range_high+x_shift,(num_train,dim))
+    X_test = np.random.uniform(X_train_range_low  +x_shift, X_train_range_high +x_shift,(num_test,dim))
 
     if dim == 1:
         if func_type == 'sin':
@@ -50,5 +56,9 @@ def generate_data_func(num_train = 40, num_test = 100, dim = 1, func_type = 'sin
         f_test = None
         Y_test = None
 
-    return X_train, f_train, Y_train, X_test, f_test, Y_test
+    if num_test == num_train: 
+        # if we select the testing set as the same as training set
+        return X_train, f_train, Y_train
+    else:
+        return X_train, f_train, Y_train, X_test, f_test, Y_test
 

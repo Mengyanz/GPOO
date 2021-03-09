@@ -6,6 +6,7 @@ from GPy.core import GP
 from GPy import likelihoods
 from GPy import kern
 from exact_inference_group import ExactGaussianInferenceGroup
+from paramz import ObsAr
 
 class GPRegression_Group(GP):
     """
@@ -81,13 +82,57 @@ class GPRegression_Group(GP):
         if self.mean_function is not None:
             self.mean_function.update_gradients(self.grad_dict['dL_dm'], self.X)
 
+    def set_XY_group(self, X= None, Y=None, A=None):
+        """
+            Set the input / output data of the model
+            This is useful if we wish to change our existing data but maintain the same model
+
+            :param X: input observations
+            :type X: np.ndarray
+            :param Y: output observations
+            :type Y: np.ndarray
+        """
+        self.update_model(False)
+        if Y is not None:
+            if self.normalizer is not None:
+                self.normalizer.scale_by(Y)
+                self.Y_normalized = ObsAr(self.normalizer.normalize(Y))
+                self.Y = Y
+            else:
+                self.Y = ObsAr(Y)
+                self.Y_normalized = self.Y
+        if X is not None:
+            if self.X in self.parameters:
+                # LVM models
+                if isinstance(self.X, VariationalPosterior):
+                    assert isinstance(X, type(self.X)), "The given X must have the same type as the X in the model!"
+                    index = self.X._parent_index_
+                    self.unlink_parameter(self.X)
+                    self.X = X
+                    self.link_parameter(self.X, index=index)
+                else:
+                    index = self.X._parent_index_
+                    self.unlink_parameter(self.X)
+                    from ..core import Param
+                    self.X = Param('latent mean', X)
+                    self.link_parameter(self.X, index=index)
+            else:
+                self.X = ObsAr(X)
+
+        # add update to A
+        if A is not None:
+            self.A = A 
+
+        self.update_model(True)
+
+
     def log_likelihood(self):
         """
         The log marginal likelihood of the model, :math:`p(\mathbf{y})`, this is the objective function of the model being optimised
         """
         return self._log_marginal_likelihood
 
-    def _raw_predict(self, Xnew, full_cov=False, kern=None):
+    def _raw_predict(self, Xnew, A_ast = None, full_cov=False, kern=None):
         """
         TODO: to be changed
         For making predictions, does not account for normalization or likelihood
@@ -101,12 +146,13 @@ class GPRegression_Group(GP):
                         = N(f*| K_{x*x}(K_{xx} + \Sigma)^{-1}Y, K_{x*x*} - K_{xx*}(K_{xx} + \Sigma)^{-1}K_{xx*}
             \Sigma := \texttt{Likelihood.variance / Approximate likelihood covariance}
         """
-        mu, var = self.posterior._raw_predict(kern=self.kern if kern is None else kern, Xnew=Xnew, pred_var=self._predictive_variable, full_cov=full_cov)
+        mu, var = self.posterior._raw_predict(kern=self.kern if kern is None else kern, Xnew=Xnew, A_ast = A_ast, pred_var=self._predictive_variable, full_cov=full_cov)
         if self.mean_function is not None:
-            mu += self.mean_function.f(Xnew)
+            # mu += self.mean_function.f(Xnew)
+            mu += A_ast.dot(self.mean_function.f(Xnew))
         return mu, var
 
-    def predict(self, Xnew, full_cov=False, Y_metadata=None, kern=None,
+    def predict(self, Xnew, A_ast = None, full_cov=False, Y_metadata=None, kern=None,
                 likelihood=None, include_likelihood=True):
         """
         TODO: to be changed
@@ -119,6 +165,8 @@ class GPRegression_Group(GP):
 
         :param Xnew: The points at which to make a prediction
         :type Xnew: np.ndarray (Nnew x self.input_dim)
+        :param A_ast: group operator (enable predictions for group)
+        :type A_ast: np.ndarray (Ngroup x Nnew)
         :param full_cov: whether to return the full covariance matrix, or just
                          the diagonal
         :type full_cov: bool
@@ -143,9 +191,11 @@ class GPRegression_Group(GP):
         Note: If you want the predictive quantiles (e.g. 95% confidence
         interval) use :py:func:"~GPy.core.gp.GP.predict_quantiles".
         """
+        if A_ast is None:
+            A_ast = np.identity(Xnew.shape[0])
 
         # Predict the latent function values
-        mean, var = self._raw_predict(Xnew, full_cov=full_cov, kern=kern)
+        mean, var = self._raw_predict(Xnew, A_ast, full_cov=full_cov, kern=kern)
 
         if include_likelihood:
             # now push through likelihood

@@ -9,11 +9,18 @@ x_shift = 0
 
 X_train_range_low = -3. + x_shift
 X_train_range_high = 3. + x_shift
-X_test_range_low = -3.5 + x_shift
-X_test_range_high = 3.5 + x_shift
+X_test_range_low = -3. + x_shift
+X_test_range_high = 3. + x_shift
+
+# X_train_range_low = -10. + x_shift
+# X_train_range_high = 10. + x_shift
+# X_test_range_low = -10. + x_shift
+# X_test_range_high = 10.+ x_shift
 
 
-def plot_1d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, A, model_name = 'gprg', num_group = None, grouping_method = 'random'):
+def plot_1d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, A, 
+group_centers, group_test, group_test_pred, group_test_var, 
+model_name = 'gprg', num_group = None, grouping_method = 'random', X_train_range_low = -3., X_train_range_high = 3., shift = 0):
 
     num_train = X_train.shape[0]
 
@@ -32,11 +39,21 @@ def plot_1d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_te
         A_sorted = A[:,sorted_train_idx]
         for i in range(A.shape[0]):
             plt.plot(X_train[sorted_train_idx,:][A_sorted[i,:] == 1,:], Y_train[sorted_train_idx,:][A_sorted[i,:] == 1,:], '.')
+    # if A_ast.shape[0] == Y_test.shape[0]:
     plt.plot(X_test[sorted_test_idx,:], f_test[sorted_test_idx,:], color = 'tab:orange', label = 'f_test')
     plt.plot(X_test[sorted_test_idx,:], Y_test_pred[sorted_test_idx,:], color = 'tab:blue', label = 'pred')
     plt.fill_between(X_test[sorted_test_idx,:].reshape(X_test.shape[0],), 
                 (Y_test_pred[sorted_test_idx,:] - 2 * np.sqrt(Y_test_var[sorted_test_idx,:])).reshape(X_test.shape[0],),
                 (Y_test_pred[sorted_test_idx,:] + 2 * np.sqrt(Y_test_var[sorted_test_idx,:])).reshape(X_test.shape[0],), alpha = 0.3)
+    # else:
+    sorted_group_idx = np.argsort(group_centers, axis = 0).reshape(group_centers.shape[0],)
+    plt.plot(group_centers[sorted_group_idx,:], group_test[sorted_group_idx,:], color = 'tab:orange', marker = 'o', label = 'group_test')
+    plt.plot(group_centers[sorted_group_idx,:], group_test_pred[sorted_group_idx,:], color = 'tab:blue', marker = 'o', label = 'group pred')
+    for c in group_centers:
+        plt.axvline(x=c, linestyle = '--', color = 'black',alpha = 0.3)
+        # plt.fill_between(X_test[sorted_test_idx,:].reshape(X_test.shape[0],), 
+        #             (Y_test_pred[sorted_test_idx,:] - 2 * np.sqrt(Y_test_var[sorted_test_idx,:])).reshape(X_test.shape[0],),
+        #             (Y_test_pred[sorted_test_idx,:] + 2 * np.sqrt(Y_test_var[sorted_test_idx,:])).reshape(X_test.shape[0],), alpha = 0.3)
     plt.legend()
     if model_name == 'gprg':
         info = model_name + '_train_' + str(num_train) + '_group_' + str(num_group) + '_' + str(grouping_method)
@@ -51,13 +68,15 @@ def plot_1d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_te
     plt.ylabel('Y')
     plt.savefig(info + '_1d' + '.png')
 
-def plot_2d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, A = None, model_name = 'gprg', num_group = None, grouping_method = 'random'):
+def plot_2d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, A, 
+group_centers, group_test, group_test_pred, group_test_var, 
+model_name = 'gprg', num_group = None, grouping_method = 'random'):
     # counter plot, only for mean
     # refer https://matplotlib.org/3.1.1/gallery/images_contours_and_fields/irregulardatagrid.html#sphx-glr-gallery-images-contours-and-fields-irregulardatagrid-py
 
     num_train = X_train.shape[0]
 
-    fig, (ax1, ax2, ax3, ax4) = plt.subplots(figsize = (30,10), ncols=4)
+    fig, axes = plt.subplots(figsize = (30,10), nrows = 2, ncols=3)
 
     if model_name == 'gprg':
         info = model_name + '_train_' + str(num_train) + '_group_' + str(num_group) + '_' + str(grouping_method)
@@ -111,22 +130,22 @@ def plot_2d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_te
     # levels = np.linspace(vmin, vmax, 14) 
     levels = 14
 
-    ax1.contour(xi, yi, zi1, levels=levels, linewidths=0.5, colors='k')
-    cntr1 = ax1.contourf(xi, yi, zi1, levels=levels, cmap="RdBu_r")
+    axes[0,0].contour(xi, yi, zi1, levels=levels, linewidths=0.5, colors='k')
+    cntr1 = axes[0,0].contourf(xi, yi, zi1, levels=levels, cmap="RdBu_r")
     if A is None:
-        ax1.plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
+        axes[0,0].plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
     else:
         for i in range(A.shape[0]):
-            ax1.plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1], 'o', ms = 3)
+            axes[0,0].plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1], 'o', ms = 3)
     # if A is None:
-    #     ax1.plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
+    #     axes[0,0].plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
     # else:
     #     for i in range(A.shape[0]):
-    #         ax1.plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1],'.',ms = 3)
-    ax1.set_xlabel('X[:,0]')
-    ax1.set_ylabel('X[:,1]')
-    ax1.set_title(info + ' (pred mean - true mean)')
-    plt.colorbar(cntr1, ax=ax1)
+    #         axes[0,0].plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1],'.',ms = 3)
+    axes[0,0].set_xlabel('X[:,0]')
+    axes[0,0].set_ylabel('X[:,1]')
+    axes[0,0].set_title(info + ' (pred mean - true mean)')
+    plt.colorbar(cntr1, ax=axes[0,0])
 
     # ------------------------------------------------------------
     # subplot 2: pred ucb - true mean
@@ -141,17 +160,17 @@ def plot_2d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_te
     # vmax = 1.
     # levels = np.linspace(vmin, vmax, 14) 
 
-    ax2.contour(xi, yi, zi2, levels=levels, linewidths=0.5, colors='k')
-    cntr2 = ax2.contourf(xi, yi, zi2, levels=levels, cmap="RdBu_r")
+    axes[0,1].contour(xi, yi, zi2, levels=levels, linewidths=0.5, colors='k')
+    cntr2 = axes[0,1].contourf(xi, yi, zi2, levels=levels, cmap="RdBu_r")
     if A is None:
-        ax2.plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
+        axes[0,1].plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
     else:
         for i in range(A.shape[0]):
-            ax2.plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1], 'o', ms = 3)
-    ax2.set_xlabel('X[:,0]')
-    ax2.set_ylabel('X[:,1]')
-    ax2.set_title(info + ' (pred ucb - true mean)')
-    plt.colorbar(cntr2, ax=ax2)
+            axes[0,1].plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1], 'o', ms = 3)
+    axes[0,1].set_xlabel('X[:,0]')
+    axes[0,1].set_ylabel('X[:,1]')
+    axes[0,1].set_title(info + ' (pred ucb - true mean)')
+    plt.colorbar(cntr2, ax=axes[0,1])
 
     # ------------------------------------------------------------
     # subplot 3: true mean - pred lcb 
@@ -162,35 +181,72 @@ def plot_2d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_te
     interpolator3= tri.LinearTriInterpolator(triang, z_diff_lcb)
     zi3 = interpolator3(Xi, Yi)
 
-    ax3.contour(xi, yi, zi3, levels=levels, linewidths=0.5, colors='k')
-    cntr3 = ax3.contourf(xi, yi, zi3, levels=levels, cmap="RdBu_r")
+    axes[0,2].contour(xi, yi, zi3, levels=levels, linewidths=0.5, colors='k')
+    cntr3 = axes[0,2].contourf(xi, yi, zi3, levels=levels, cmap="RdBu_r")
     if A is None:
-        ax3.plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
+        axes[0,2].plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
     else:
         for i in range(A.shape[0]):
-            ax3.plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1], 'o', ms = 3)
-    ax3.set_xlabel('X[:,0]')
-    ax3.set_ylabel('X[:,1]')
-    ax3.set_title(info + ' (true mean - pred lcb)')
-    plt.colorbar(cntr3, ax=ax3)
+            axes[0,2].plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1], 'o', ms = 3)
+    axes[0,2].set_xlabel('X[:,0]')
+    axes[0,2].set_ylabel('X[:,1]')
+    axes[0,2].set_title(info + ' (true mean - pred lcb)')
+    plt.colorbar(cntr3, ax=axes[0,2])
 
     # --------------------------------------------------------------
-    # subplot 4: pred var
+    # subplot 4: true mean
 
-    interpolator4= tri.LinearTriInterpolator(triang, z_test_pred_var)
+    interpolator4= tri.LinearTriInterpolator(triang, z_test)
     zi4 = interpolator4(Xi, Yi)
 
-    ax4.contour(xi, yi, zi4, levels=levels, linewidths=0.5, colors='k')
-    cntr4 = ax4.contourf(xi, yi, zi4, levels=levels, cmap="RdBu_r")
+    axes[1,0].contour(xi, yi, zi4, levels=levels, linewidths=0.5, colors='k')
+    cntr4 = axes[1,0].contourf(xi, yi, zi4, levels=levels, cmap="RdBu_r")
     if A is None:
-        ax4.plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
+        axes[1,0].plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
     else:
         for i in range(A.shape[0]):
-            ax4.plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1], 'o', ms = 3)
-    ax4.set_xlabel('X[:,0]')
-    ax4.set_ylabel('X[:,1]')
-    ax4.set_title(info + ' pred var')
-    plt.colorbar(cntr4, ax=ax4)
+            axes[1,0].plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1], 'o', ms = 3)
+    axes[1,0].set_xlabel('X[:,0]')
+    axes[1,0].set_ylabel('X[:,1]')
+    axes[1,0].set_title(info + ' true mean')
+    plt.colorbar(cntr4, ax=axes[1,0])
+
+
+    # --------------------------------------------------------------
+    # subplot 5: pred mean
+
+    interpolator5= tri.LinearTriInterpolator(triang, z_test_pred)
+    zi5 = interpolator5(Xi, Yi)
+
+    axes[1,1].contour(xi, yi, zi5, levels=levels, linewidths=0.5, colors='k')
+    cntr5 = axes[1,1].contourf(xi, yi, zi5, levels=levels, cmap="RdBu_r")
+    if A is None:
+        axes[1,1].plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
+    else:
+        for i in range(A.shape[0]):
+            axes[1,1].plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1], 'o', ms = 3)
+    axes[1,1].set_xlabel('X[:,0]')
+    axes[1,1].set_ylabel('X[:,1]')
+    axes[1,1].set_title(info + ' pred mean')
+    plt.colorbar(cntr5, ax=axes[1,1])
+
+    # --------------------------------------------------------------
+    # subplot 6: pred var
+
+    interpolator6= tri.LinearTriInterpolator(triang, z_test_pred_var)
+    zi6 = interpolator6(Xi, Yi)
+
+    axes[1,2].contour(xi, yi, zi6, levels=levels, linewidths=0.5, colors='k')
+    cntr6 = axes[1,2].contourf(xi, yi, zi6, levels=levels, cmap="RdBu_r")
+    if A is None:
+        axes[1,2].plot(X_train[:,0], X_train[:,1],'ko',ms = 3)
+    else:
+        for i in range(A.shape[0]):
+            axes[1,2].plot(X_train[A[i,:] == 1,0], X_train[A[i,:] == 1,1], 'o', ms = 3)
+    axes[1,2].set_xlabel('X[:,0]')
+    axes[1,2].set_ylabel('X[:,1]')
+    axes[1,2].set_title(info + ' pred var')
+    plt.colorbar(cntr6, ax=axes[1,2])
 
 
     # plt.contour(X_train[:,0], X_train[:,1], Y_train,label = 'train')
