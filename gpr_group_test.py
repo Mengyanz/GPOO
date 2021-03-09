@@ -87,6 +87,12 @@ def generate_A(grouping_method, num_group = 30):
         for idx,i in enumerate(group_idx):
             A[i, idx] = 1
         group_centers = kmeans.cluster_centers_
+    elif grouping_method == 'similarY':
+        kmeans = KMeans(n_clusters=num_group, init = 'k-means++', random_state= 0).fit(Y_train)
+        group_idx = kmeans.labels_
+        for idx,i in enumerate(group_idx):
+            A[i, idx] = 1
+        group_centers = kmeans.cluster_centers_
     elif grouping_method == 'evenly':
         group_idx = 0
         sorted_train_idx = np.argsort(X_train, axis = 0).reshape(X_train.shape[0],)
@@ -177,7 +183,7 @@ def run_gprg_online(A):
 # plt.show()
 
 #-------------------------------------------------
-grouping_method = 'cluster'
+grouping_method = 'similarY' # 'cluster'
 A, group_centers = generate_A(grouping_method, num_group)
 print('group centers: ', group_centers)
 # A_ast = np.identity(Y_test.shape[0])

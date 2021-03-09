@@ -213,15 +213,16 @@ class UCB():
             A[i, idx] = 1
         return A
 
-    def max_ucb(self, t):
+    def max_ucb(self, t, beta = 1):
         # fill in the t^th sample group
         # the arms in the sample are set to 1, otherwise 0
 
         # method one: rec group with max ucb 
 
         # method two: rec top m arms with max ucb as a group 
-
-
+        group_mu, group_sigma = self.gpg.predict(self.arms, A_ast = self.A)
+        rec_idx = np.argmax(group_mu + beta * group_sigma)
+        self.sample_groups[t,:] = self.A[rec_idx]
         # self.sample_groups[t, :] = xxx
 
     def simulate(self):
