@@ -18,29 +18,6 @@ from generate_data import generate_data_func
 # Goal: Recommend the best group.
 # Baseline: groups are randomly chosen.
 
-# We consider the same setting as shown in gpr_group_test.py
-
-# Setting One:
-# Fixed group in each round
-
-x_shift = 0
-
-# X_train_range_low = -3. + x_shift
-# X_train_range_high = 3. + x_shift
-# X_test_range_low = -3.5 + x_shift
-# X_test_range_high = 3.5 + x_shift
-
-X_train_range_low = -10. 
-X_train_range_high = 10. 
-
-num_train = 500
-num_test = 2000
-# num_train = X_train.shape[0]
-# TODO: for now, assume num_train/num_group is integer
-num_group = 50
-num_element_in_group = int(num_train/num_group)
-dim = 2
-
 # 20210306: bandits setting does not really make sense to me
 # why do we need to repeatedly select one group?
 # maybe it makes more sense to have noise included for individual level
@@ -53,10 +30,10 @@ dim = 2
 # We need a pure exploration group bandit algorithm (maybe for GP model precisely?)
 
 class SR():
-    def __init__(self, budget, num_arms, fixed_samples = None):
+    def __init__(self, budget, num_arms, fixed_noise = None):
         self.budget = budget
         self.num_arms = num_arms
-        self.fixed_samples = fixed_samples
+        self.fixed_noise = fixed_noise
 
         self.barlogK = 1.0/(1.0 + 1)
         for i in range(1, self.num_arms - 1.0 + 1):
@@ -106,8 +83,8 @@ class SR():
             reward = self.env[arm_idx].sample()
         else:
             #print('sample idx: ', sample_idx)
-            #print(self.fixed_samples[arm_idx])
-            reward = self.fixed_samples[arm_idx][sample_idx]
+            #print(self.fixed_noise[arm_idx])
+            reward = self.fixed_noise[arm_idx][sample_idx]
         self.sample_rewards[arm_idx].append(reward)
         self.left_budget -=1
         return reward
@@ -130,7 +107,7 @@ class SR():
             # step 1
             for i in self.active_set:
                 for j in range(num_samples):
-                    if self.fixed_samples != None:
+                    if self.fixed_noise != None:
                         self.sample(i, len(self.sample_rewards[i]))
                     else:
                         self.sample(i)
@@ -171,11 +148,13 @@ class SR():
 # 3. follow similar idea as decision tree: form big groups (e.g. >= 100 arms in each group) at the init round, then in each group, ...
 
 class UCB():
-    def __init__(self, budget, num_arms, num_group, group_method = 'kmeans', fixed_samples = None):
+    def __init__(self, budget, num_arms, num_group, group_method = 'kmeans', fixed_noise = None):
+        # TODO: implement fixed_noise
+        
         self.budget = budget
         self.num_arms = num_arms
         self.num_group = num_group
-        self.fixed_samples = fixed_samples
+        self.fixed_noise = fixed_noise
 
         self.arms, self.f_train, self.Y_train = generate_data_func(self.num_arms ,self.num_arms ,dim=dim, X_train_range_low = X_train_range_low, X_train_range_high = X_train_range_high, x_shift = x_shift, func_type='sin')
 
@@ -184,12 +163,15 @@ class UCB():
         self.sample_groups = np.zeros((self.budget, self.num_arms))
         self.gpg = None
         self.mu = np.zeros((self.num_arms,))
-        self.std = np.ones((self.num_arms,))
+        self.sigma = np.ones((self.num_arms,))
         self.rewards = []
 
     def sample(self):
         # sample group reward and add it into rewards record
-        self.rewards.append(self.sample_groups[-1,:].dot(self.f_train) + np.random.randn()*0.05)
+    
+        sample = self.sample_groups[-1,:].dot(self.f_train) + np.random.randn()*1
+
+        self.rewards.append(sample)
 
     def update(self):
         # update the posterior mean and std for each arm
@@ -197,11 +179,14 @@ class UCB():
 
         if self.gpg is None:
             self.gpg = GPRegression_Group(self.arms,np.asarray(self.rewards).reshape(num_sample,1),
-                                self.kernel, noise_var=0.005, A = self.sample_groups[:num_sample,:].reshape(num_sample, self.num_arms))
+            self.kernel, noise_var=0.005, A = self.sample_groups[:num_sample,:].reshape(num_sample, self.num_arms))
         else:
             self.gpg.set_XY_group(X=self.arms, Y= np.asarray(self.rewards).reshape(num_sample,1), A= self.sample_groups[:num_sample,:].reshape(num_sample, self.num_arms))
 
+        # pred for indi
         self.mu, self.sigma = self.gpg.predict(self.arms)
+        # pred for group
+        self.group_mu, self.group_sigma = self.gpg.predict(self.arms, A_ast = self.A)
 
     def form_group(self):
         # construct matrix A \in R^{g * n}
@@ -209,8 +194,10 @@ class UCB():
         # the arms in the group are set to 1, otherwise 0
         kmeans = KMeans(n_clusters=self.num_group, init = 'k-means++', random_state= 0).fit(self.arms)
         group_idx = kmeans.labels_
+        A = np.zeros((self.num_group, self.num_arms))
         for idx,i in enumerate(group_idx):
             A[i, idx] = 1
+        self.group_centers = kmeans.cluster_centers_
         return A
 
     def max_ucb(self, t, beta = 1):
@@ -220,14 +207,17 @@ class UCB():
         # method one: rec group with max ucb 
 
         # method two: rec top m arms with max ucb as a group 
-        group_mu, group_sigma = self.gpg.predict(self.arms, A_ast = self.A)
-        rec_idx = np.argmax(group_mu + beta * group_sigma)
+        if t == 0:
+            # TODO: other methods than randomly choose a rec_idx initially 
+            rec_idx = np.random.choice(list(range(self.num_group)))
+        else:
+            rec_idx = np.argmax(self.group_mu + beta * self.group_sigma)
         self.sample_groups[t,:] = self.A[rec_idx]
         # self.sample_groups[t, :] = xxx
 
     def simulate(self):
         # REVIEW: for now we keep the group fixed 
-        self.A = form_group()
+        self.A = self.form_group()
 
         for t in range(budget):
             # all our rec and sample are in group level
@@ -237,11 +227,51 @@ class UCB():
 
     def evaluation(self):
         # TODO: how to evaluate the pipeline?
-        # 
+
+        # evaluate the prediction when budget is run out?
+        print('Prediction for individual:')
+        print('mean squared error: ', mean_squared_error(self.Y_train, self.mu))
+        print('r2 score: ', r2_score(self.Y_train, self.mu))
+
+        print('Prediction for group (select A_ast = A):')
+        group_train = self.A.dot(self.Y_train)
+        print('mean squared error: ', mean_squared_error(group_train, self.group_mu))
+        print('r2 score: ', r2_score(group_train, self.group_mu))
+
+        if dim == 1:
+            plot_1d(self.arms, self.Y_train, self.f_train, self.Y_train, self.f_train, self.Y_train, self.mu, self.sigma, self.A, 
+            self.group_centers, group_train, self.group_mu, self.group_sigma, 
+            'gprg', self.num_group)  
+        
             
+# Test
+# We consider the same setting as shown in gpr_group_test.py
 
+# Setting One:
+# Fixed group in each round
 
+x_shift = 0
 
+# X_train_range_low = -3. + x_shift
+# X_train_range_high = 3. + x_shift
+# X_test_range_low = -3.5 + x_shift
+# X_test_range_high = 3.5 + x_shift
 
+X_train_range_low = -10. 
+X_train_range_high = 10. 
+
+budget = 50
+num_arms = 100
+# num_train = X_train.shape[0]
+num_group = 10
+dim = 2
+
+# REVIEW: why we want a UCB type of algorithm? why does the uncertainty important? why we want to sample one arm multiple times?
+# ? when the space is too large too cover (# num_arms > # num_budget)
+# ? when the var of one arm is too large 
+
+ucb = UCB(budget = budget, num_arms = num_arms, num_group = num_group, group_method = 'kmeans', fixed_noise = None)
+ucb.simulate()
+ucb.evaluation()
 
 

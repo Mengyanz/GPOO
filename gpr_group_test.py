@@ -15,8 +15,8 @@ x_shift = 0
 # X_test_range_low = -3.5 + x_shift
 # X_test_range_high = 3.5 + x_shift
 
-X_train_range_low = -3. 
-X_train_range_high = 3. 
+X_train_range_low = -10. 
+X_train_range_high = 10. 
 # X_test_range_low = -10.5 
 # X_test_range_high = 10.5 
 
@@ -29,11 +29,11 @@ X_train_range_high = 3.
 # Y = np.sin(X) + np.random.randn(50,1)*0.05
 # X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.2, random_state = 4)
 
-num_train = 30
-num_test = 30
+num_train = 100
+num_test = 100
 # num_train = X_train.shape[0]
 # TODO: for now, assume num_train/num_group is integer
-num_group = 5
+num_group = 10
 num_element_in_group = int(num_train/num_group)
 dim = 1
 
@@ -129,7 +129,7 @@ def generate_A(grouping_method, num_group = 30):
 
 def run_gprg(A, A_ast = None):
     # TODO: at some time, we want to introduce noise for individual level as well
-    Y_group = A.dot(f_train) + np.random.randn(num_group,1)*0.05
+    Y_group = A.dot(f_train) + np.random.randn(num_group,1)*5 # *0.05
     # Y_group = A.dot(Y_train)
 
     kernel = GPy.kern.RBF(input_dim=dim, variance=1., lengthscale=1.)
@@ -183,7 +183,7 @@ def run_gprg_online(A):
 # plt.show()
 
 #-------------------------------------------------
-grouping_method = 'similarY' # 'cluster'
+grouping_method = 'cluster' # 'similarY' # 
 A, group_centers = generate_A(grouping_method, num_group)
 print('group centers: ', group_centers)
 # A_ast = np.identity(Y_test.shape[0])
