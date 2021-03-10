@@ -8,6 +8,8 @@ from generate_data import generate_data_func
 from plot import plot_1d, plot_2d
 from sklearn.cluster import KMeans
 
+np.random.seed(1996)
+
 x_shift = 0
 
 # X_train_range_low = -3. + x_shift
@@ -15,8 +17,8 @@ x_shift = 0
 # X_test_range_low = -3.5 + x_shift
 # X_test_range_high = 3.5 + x_shift
 
-X_train_range_low = -10. 
-X_train_range_high = 10. 
+X_train_range_low = -3. 
+X_train_range_high = 3. 
 # X_test_range_low = -10.5 
 # X_test_range_high = 10.5 
 
@@ -29,11 +31,12 @@ X_train_range_high = 10.
 # Y = np.sin(X) + np.random.randn(50,1)*0.05
 # X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.2, random_state = 4)
 
-num_train = 100
-num_test = 100
+num_train = 30
+num_test = 30
 # num_train = X_train.shape[0]
 # TODO: for now, assume num_train/num_group is integer
-num_group = 10
+num_group = 5
+noise = 1
 num_element_in_group = int(num_train/num_group)
 dim = 1
 
@@ -129,7 +132,7 @@ def generate_A(grouping_method, num_group = 30):
 
 def run_gprg(A, A_ast = None):
     # TODO: at some time, we want to introduce noise for individual level as well
-    Y_group = A.dot(f_train) + np.random.randn(num_group,1)*5 # *0.05
+    Y_group = A.dot(f_train) + np.random.randn(num_group,1) * noise
     # Y_group = A.dot(Y_train)
 
     kernel = GPy.kern.RBF(input_dim=dim, variance=1., lengthscale=1.)
@@ -143,12 +146,12 @@ def run_gprg(A, A_ast = None):
 
     return Y_test_pred, Y_test_var
 
-def run_gprg_online(A):
+def run_gprg_online(A, A_ast = None):
     # REVIEW: for now, test each row of A is a data point
     # the input X_train is the same for each round
     # only A and f_group is different 
 
-    Y_group = A.dot(f_train) + np.random.randn(num_group,1)*0.05
+    Y_group = A.dot(f_train) + np.random.randn(num_group,1)* noise
     # Y_group = A.dot(Y_train)
 
     kernel = GPy.kern.RBF(input_dim=dim, variance=1., lengthscale=1.)
@@ -162,7 +165,7 @@ def run_gprg_online(A):
         # could be computational expensive 
         m.set_XY_group(X=X_train, Y= Y_group[:i+1,:], A= A[:i+1,:].reshape(i+1, A.shape[1]))
         
-    Y_test_pred, Y_test_var = m.predict(X_test)
+    Y_test_pred, Y_test_var = m.predict(X_test,A_ast=A_ast)
 
     return Y_test_pred, Y_test_var
 #------------------------------------------------------
@@ -196,7 +199,9 @@ print('group centers: ', group_centers)
 
 #---------------------------------------------------------
 print('Prediction for individual:')
-Y_test_pred, Y_test_var = run_gprg(A, np.identity(Y_test.shape[0]))
+Y_test_pred, Y_test_var = run_gprg_online(A, np.identity(Y_test.shape[0]))
+# print('Y test: ', Y_test)
+# print('Y test pred: ', Y_test_pred)
 mse_test = mean_squared_error(Y_test, Y_test_pred)
 print('mean squared error: ', mse_test)
 r2_score_test = r2_score(Y_test, Y_test_pred)
@@ -205,7 +210,8 @@ print('r2 score: ', r2_score_test)
 # TODO: extend the evaluation into A_ast != A
 print('Prediction for group (select A_ast = A):')
 group_test = A.dot(Y_test)
-group_test_pred, group_test_var = run_gprg(A, A)
+print(group_test)
+group_test_pred, group_test_var = run_gprg_online(A, A)
 mse_test = mean_squared_error(group_test, group_test_pred)
 print('mean squared error: ', mse_test)
 r2_score_test = r2_score(group_test, group_test_pred)

@@ -12,7 +12,7 @@ class ExactGaussianInferenceGroup(ExactGaussianInference):
         TODO: to be changed
         Returns a Posterior class containing essential quantities of the posterior
         """
-        print('ExactGaussianInferenceGroup inference:')
+        # print('ExactGaussianInferenceGroup inference:')
         if mean_function is None:
             m = 0
         else:
@@ -50,7 +50,7 @@ class ExactGaussianInferenceGroup(ExactGaussianInference):
         # FIXME: confirm the gradient update is correct
         # dL_dK = 0.5 * (tdot(alpha) - Y.shape[1] * Wi)
         dL_dK = 0.5 * A.T.dot((tdot(alpha) - Y.shape[1] * Wi)).dot(A)
-        print('dL_dK shape', dL_dK.shape)
+        # print('dL_dK shape', dL_dK.shape)
 
         dL_dthetaL = likelihood.exact_inference_gradients(np.diag(dL_dK), Y_metadata)
 

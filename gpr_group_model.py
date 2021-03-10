@@ -73,7 +73,7 @@ class GPRegression_Group(GP):
             This method is not designed to be called manually, the framework is set up to automatically call this method upon changes to parameters, if you call
             this method yourself, there may be unexpected consequences.
         """
-        print('GPRG trigger parameters changed.')
+        # print('GPRG trigger parameters changed.')
         self.posterior, self._log_marginal_likelihood, self.grad_dict = self.inference_method.inference(self.kern, self.X, self.likelihood, self.Y_normalized, self.mean_function, self.Y_metadata, A = self.A)
         # REVIEW: whether we need to change likelihood (Gaussian), kern, mean_function class?
         self.likelihood.update_gradients(self.grad_dict['dL_dthetaL'])

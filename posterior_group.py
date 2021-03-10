@@ -12,7 +12,7 @@ class PosteriorExactGroup(PosteriorExact):
         
 
     def _raw_predict(self, kern, Xnew, A_ast, pred_var, full_cov=False):
-        print('PosteriorExactGroup _raw_predict')
+        # print('PosteriorExactGroup _raw_predict')
         # NOTE: change Kx to AKx
         # NOTE: add .dot(A_ast.T)
         Kx = self.A.dot(kern.K(pred_var, Xnew)).dot(A_ast.T)

@@ -7,8 +7,10 @@ from gpr_group_model import GPRegression_Group
 from generate_data import generate_data_func
 from plot import plot_1d, plot_2d
 from sklearn.cluster import KMeans
-from gpr_group_test import generate_A, run_gprg
+# from gpr_group_test import generate_A, run_gprg
 from generate_data import generate_data_func
+
+np.random.seed(1996)
 
 # 2021/Mar/06
 
@@ -166,10 +168,10 @@ class UCB():
         self.sigma = np.ones((self.num_arms,))
         self.rewards = []
 
-    def sample(self):
+    def sample(self, t):
         # sample group reward and add it into rewards record
-    
-        sample = self.sample_groups[-1,:].dot(self.f_train) + np.random.randn()*1
+        sample = self.sample_groups[t,:].dot(self.f_train) + np.random.randn()* noise
+        print(sample)
 
         self.rewards.append(sample)
 
@@ -212,7 +214,8 @@ class UCB():
             rec_idx = np.random.choice(list(range(self.num_group)))
         else:
             rec_idx = np.argmax(self.group_mu + beta * self.group_sigma)
-        self.sample_groups[t,:] = self.A[rec_idx]
+        print(rec_idx)
+        self.sample_groups[t,:] = self.A[rec_idx,:]
         # self.sample_groups[t, :] = xxx
 
     def simulate(self):
@@ -222,7 +225,7 @@ class UCB():
         for t in range(budget):
             # all our rec and sample are in group level
             self.max_ucb(t)
-            self.sample()
+            self.sample(t)
             self.update()
 
     def evaluation(self):
@@ -231,6 +234,8 @@ class UCB():
         # evaluate the prediction when budget is run out?
         print('Prediction for individual:')
         print('mean squared error: ', mean_squared_error(self.Y_train, self.mu))
+        # print('Y train: ', self.Y_train)
+        # print('mu: ', self.mu)
         print('r2 score: ', r2_score(self.Y_train, self.mu))
 
         print('Prediction for group (select A_ast = A):')
@@ -238,10 +243,10 @@ class UCB():
         print('mean squared error: ', mean_squared_error(group_train, self.group_mu))
         print('r2 score: ', r2_score(group_train, self.group_mu))
 
-        if dim == 1:
-            plot_1d(self.arms, self.Y_train, self.f_train, self.Y_train, self.f_train, self.Y_train, self.mu, self.sigma, self.A, 
-            self.group_centers, group_train, self.group_mu, self.group_sigma, 
-            'gprg', self.num_group)  
+        
+        plot_1d(self.arms, self.arms, self.f_train, self.Y_train, self.f_train, self.Y_train, self.mu, self.sigma, self.A, 
+        self.group_centers, group_train, self.group_mu, self.group_sigma, 
+        'gprg', self.num_group, grouping_method = 'kmeans')  
         
             
 # Test
@@ -257,14 +262,15 @@ x_shift = 0
 # X_test_range_low = -3.5 + x_shift
 # X_test_range_high = 3.5 + x_shift
 
-X_train_range_low = -10. 
-X_train_range_high = 10. 
+X_train_range_low = -3. 
+X_train_range_high = 3. 
 
-budget = 50
-num_arms = 100
+budget = 5
+num_arms = 30
 # num_train = X_train.shape[0]
-num_group = 10
-dim = 2
+num_group = 5
+dim = 1
+noise = 1
 
 # REVIEW: why we want a UCB type of algorithm? why does the uncertainty important? why we want to sample one arm multiple times?
 # ? when the space is too large too cover (# num_arms > # num_budget)
