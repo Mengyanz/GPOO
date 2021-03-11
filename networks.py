@@ -3,7 +3,8 @@ from tensorflow.keras import layers
 import numpy as np
 
 class MlpA(object):
-    def __init__(self, num_inputs, num_outputs, num_layers=2, width=128):
+    def __init__(self, num_inputs, num_outputs, num_layers=4, width=128, 
+            batchnorm=True, output_act='softmax'):
         self.num_inputs     = num_inputs
         self.num_outputs    = num_outputs
         
@@ -18,9 +19,11 @@ class MlpA(object):
                 num_input_nodes = width
             if l == (num_layers - 1):
                 num_nodes = num_outputs
-                activation = 'softmax'
+                activation = output_act
             model.add(layers.Dense(num_nodes, input_dim = num_input_nodes, 
                 activation=activation, kernel_initializer=initialiser))
+            if batchnorm and l != (num_layers-1):
+                model.add(layers.BatchNormalization())
 
         self.model = model
 
@@ -35,4 +38,4 @@ class MlpA(object):
         return tf.transpose(outputs)
 
     def get_weights(self):
-        return self.model.weights
+        return self.model.trainable_variables

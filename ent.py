@@ -1,24 +1,26 @@
 import numpy as np
 import scipy.spatial as sp
 import tensorflow as tf
-import tensorflow_probability as tfp
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import gp_ent_cluster
 import networks
+import utils
 
 tf.config.run_functions_eagerly(False)
 
-NOISE_VAR = 1.
-NUM_GROUPS = 3
-NUM_TEST = 12
+NOISE_VAR = 10.
+NUM_GROUPS = 4
+NUM_TEST = 30
 
 ## Make some data
 c1 = np.random.normal(0, 0.2, (100, 2))
 c2 = np.random.normal(-1, 0.2, (100, 2))
 c3 = np.random.normal(1, 0.2, (100, 2))
+theta = np.linspace(0, 2*np.pi, 100)
+c4 = np.hstack((np.cos(theta).reshape(100,1), np.sin(theta).reshape(100,1)))
 
-X = np.vstack((c1, c2, c3))
+X = np.vstack((c1, c2, c3, c4))
 x1 = np.linspace(-1, 1, 12)
 x2 = np.linspace(-1, 1, 12)
 X_star = np.transpose([np.tile(x1, len(x2)), np.repeat(x2, len(x1))])
@@ -34,18 +36,13 @@ while True:
 
     np_A = cluster.A(X).numpy()
     print(entropy.numpy())
-    if (c % 1000) == 0:
+    if (c % 100) == 0:
         plt.matshow(np_A.T @ np_A)
         plt.savefig('group_kernel.pdf')
         plt.close()
        
-        np_A = np_A - np.amin(np_A)
-        np_A = np_A / np.amax(np_A)
-        plt.scatter(X[:, 0], X[:,1], c=np_A.T)
+        plt.scatter(X[:, 0], X[:,1], c=utils.project_to_rgb(np_A.T))
         plt.savefig('plt.pdf')
         plt.close()
     c = c + 1
-
-
-
 
