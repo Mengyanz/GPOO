@@ -11,7 +11,7 @@ tf.config.run_functions_eagerly(False)
 
 NOISE_VAR = 10.
 NUM_GROUPS = 4
-NUM_TEST = 30
+NUM_TEST = 12
 
 ## Make some data
 c1 = np.random.normal(0, 0.2, (100, 2))
@@ -21,8 +21,8 @@ theta = np.linspace(0, 2*np.pi, 100)
 c4 = np.hstack((np.cos(theta).reshape(100,1), np.sin(theta).reshape(100,1)))
 
 X = np.vstack((c1, c2, c3, c4))
-x1 = np.linspace(-1, 1, 12)
-x2 = np.linspace(-1, 1, 12)
+x1 = np.linspace(-1, 1, NUM_TEST)
+x2 = np.linspace(-1, 1, NUM_TEST)
 X_star = np.transpose([np.tile(x1, len(x2)), np.repeat(x2, len(x1))])
 
 # Initialise the GP clusterer
