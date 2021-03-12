@@ -8,6 +8,14 @@ from generate_data import generate_data_func
 from plot import plot_1d, plot_2d
 from sklearn.cluster import KMeans
 
+import scipy.spatial as sp
+import tensorflow as tf
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import gp_ent_cluster
+import networks
+import utils
+
 np.random.seed(1996)
 
 x_shift = 0
@@ -90,6 +98,26 @@ def generate_A(grouping_method, num_group = 30):
         for idx,i in enumerate(group_idx):
             A[i, idx] = 1
         group_centers = kmeans.cluster_centers_
+    elif grouping_method == 'ent':
+        # TODO: does not work for now
+        # Initialise the GP clusterer
+        A = networks.MlpA(X_train.shape[1], num_group)
+        cluster = gp_ent_cluster.GPEntCluster(noise, num_group, X_train, X_train, A=A)
+
+        # Minimise the entropy using gradient tape
+        c = 0
+        while c<=500:
+            _, entropy = cluster.train_step(X_train, True, True)
+            A = cluster.A(X).numpy()
+            c += 1
+        plt.matshow(np_A.T @ np_A)
+        plt.savefig('group_kernel.pdf')
+        plt.close()
+       
+        plt.scatter(X[:, 0], X[:,1], c=utils.project_to_rgb(np_A.T))
+        plt.savefig('plt.pdf')
+        plt.close()
+
     elif grouping_method == 'similarY':
         kmeans = KMeans(n_clusters=num_group, init = 'k-means++', random_state= 0).fit(Y_train)
         group_idx = kmeans.labels_
@@ -186,7 +214,7 @@ def run_gprg_online(A, A_ast = None):
 # plt.show()
 
 #-------------------------------------------------
-grouping_method = 'cluster' # 'similarY' # 
+grouping_method = 'ent' # 'cluster' # 'similarY' # 
 A, group_centers = generate_A(grouping_method, num_group)
 print('group centers: ', group_centers)
 # A_ast = np.identity(Y_test.shape[0])

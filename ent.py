@@ -31,7 +31,7 @@ cluster = gp_ent_cluster.GPEntCluster(NOISE_VAR, NUM_GROUPS, X, X_star, A=A)
 
 # Minimise the entropy using gradient tape
 c = 0
-while True:
+while c<=500:
     _, entropy = cluster.train_step(X, True, True)
 
     np_A = cluster.A(X).numpy()
