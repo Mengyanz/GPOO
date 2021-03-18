@@ -10,7 +10,7 @@ from sklearn.cluster import KMeans
 # from gpr_group_test import generate_A, run_gprg
 from generate_data import generate_data_func
 
-np.random.seed(1996)
+# np.random.seed(1996)
 
 # 2021/Mar/06
 
@@ -27,12 +27,14 @@ np.random.seed(1996)
 class Pipeline():
     """GPR-G + form group by cluster + bandits algorithm (UCB/SR)
     """
-    def __init__(self, budget, num_arms, num_group, group_method = 'kmeans', fixed_noise = None):
+    def __init__(self, budget, num_arms, num_group, group_method = 'kmeans', noise = 0.1, fixed_noise = None):
         # TODO: implement fixed_noise 
         self.budget = budget
         self.num_arms = num_arms
         self.num_group = num_group
         self.fixed_noise = fixed_noise
+        self.group_method = group_method
+        self.noise = noise
 
         self.arms, self.f_train, self.Y_train = generate_data_func(self.num_arms ,self.num_arms ,dim=dim, X_train_range_low = X_train_range_low, X_train_range_high = X_train_range_high, x_shift = x_shift, func_type='sin')
 
@@ -46,8 +48,8 @@ class Pipeline():
 
     def sample(self, t):
         # sample group reward and add it into rewards record
-        sample = self.sample_groups[t,:].dot(self.f_train) + np.random.randn()* noise
-        print(sample)
+        sample = self.sample_groups[t,:].dot(self.f_train) + np.random.randn()* self.noise
+        # print(sample)
 
         self.rewards.append(sample)
 
@@ -70,13 +72,17 @@ class Pipeline():
         # construct matrix A \in R^{g * n}
         # each row represents one group
         # the arms in the group are set to 1, otherwise 0
-        kmeans = KMeans(n_clusters=self.num_group, init = 'k-means++', random_state= 0).fit(self.arms)
-        group_idx = kmeans.labels_
-        A = np.zeros((self.num_group, self.num_arms))
-        for idx,i in enumerate(group_idx):
-            A[i, idx] = 1
-        self.group_centers = kmeans.cluster_centers_
-        return A
+        if self.group_method == 'kmeans':
+            kmeans = KMeans(n_clusters=self.num_group, init = 'k-means++', random_state= 0).fit(self.arms)
+            group_idx = kmeans.labels_
+            A = np.zeros((self.num_group, self.num_arms))
+            for idx,i in enumerate(group_idx):
+                A[i, idx] = 1
+            self.group_centers = kmeans.cluster_centers_
+            return A
+        elif self.group_method == 'identity':
+            self.group_centers = self.arms
+            return np.eye(N = self.num_arms)
 
     def evaluation(self):
         # TODO: how to evaluate the pipeline?
@@ -105,9 +111,9 @@ class Pipeline():
 # 3. (we might want to cook up posterior std as a guideline for designing sample size)
 # 4. another (open) questions is: how to deal with arm set which are changing (I imagine in our setting, later on we would like to dynamic form the groups)? Now in SR, the sample size is pre-allocated so only works for fixed set of arms. 
 
-class SR(Pipeline):
-    def __init__(self, budget, num_arms, num_group, group_method = 'kmeans', fixed_noise = None):
-        super().__init__(budget, num_arms, num_group, group_method, fixed_noise)
+class SR_Fixed_Group(Pipeline):
+    def __init__(self, budget, num_arms, num_group, group_method = 'kmeans', noise = 0.1, fixed_noise = None):
+        super().__init__(budget, num_arms, num_group, group_method, noise, fixed_noise)
         self.barlogK = 1.0/(1.0 + 1)
         # REVIEW: for now, we form the "arm" of pre-defined fixed groups
         for i in range(1, self.num_group):
@@ -151,7 +157,7 @@ class SR(Pipeline):
             # print('active set: ', len(self.active_set))
             # sample_count += num_samples * len(self.active_set)
             # print('sample count: ', sample_count)
-            print('num samples: ', num_samples)
+            # print('num samples: ', num_samples)
             # step 1
             for i in self.active_set:
                 for j in range(num_samples):
@@ -161,23 +167,37 @@ class SR(Pipeline):
                     t += 1
             self.update()
             
-            print('group mu: ', self.group_mu)
-            sorted_group_mu_idx = np.argsort(self.group_mu.reshape(self.num_group,))
-            print('sorted group mu idx: ', sorted_group_mu_idx)
-            for idx in np.sort(sorted_group_mu_idx)[::-1]:
-                if idx in self.active_set:
-                    # remove the group in active set with smallest pred mean
-                    print('remove idx: ', idx)
-                    self.active_set.remove(idx)
+            # print('group mu: ', self.group_mu)
+            # TODO: remove the smallest one in active set
+            group_mu = self.group_mu.copy()
+            while True:
+                min_idx = np.argmin(group_mu.reshape(len(group_mu),))
+                if min_idx in self.active_set:
+                    self.active_set.remove(min_idx)
                     break
+                else:
+                    group_mu[min_idx] = 1e5 # set to a very large value
+
+            # sorted_group_mu_idx = np.argsort(self.group_mu.reshape(self.num_group,))
+            # print('sorted group mu idx: ', sorted_group_mu_idx)
+            # for i, idx in enumerate(np.sort(sorted_group_mu_idx)[::-1]):
+            #     if idx in self.active_set:
+            #         # remove the group in active set with smallest pred mean
+            #         print('remove idx: ', i)
+            #         self.active_set.remove(i)
+            #         break
                 
-            print('active set: ', self.active_set)
+            # print('active set: ', self.active_set)
 
             n_last_phase = n_current_phase
 
         self.rec_set = self.active_set
+        print(np.asarray(self.f_train)[np.asarray(self.A[np.asarray(list(self.rec_set))][0], dtype=bool)])
         # only works for 1.0 = 1
         assert len(self.rec_set) == 1.0
+
+        rec_idx = np.argmax(self.mu)
+        print('rec arm index: ', rec_idx, ' with mean: ', self.f_train[rec_idx])
 
 # It is more natural to use UCB type of algorithm, similar to GPUCB
 # so we test UCB algorithm
@@ -197,7 +217,7 @@ class SR(Pipeline):
 #    the group forming change all the time and based on the prediction
 # 3. follow similar idea as decision tree: form big groups (e.g. >= 100 arms in each group) at the init round, then in each group, ...
 
-class UCB(Pipeline):
+class UCB_Fixed_Group(Pipeline):
     def max_ucb(self, t, beta = 1):
         # fill in the t^th sample group
         # the arms in the sample are set to 1, otherwise 0
@@ -210,7 +230,7 @@ class UCB(Pipeline):
             rec_idx = np.random.choice(list(range(self.num_group)))
         else:
             rec_idx = np.argmax(self.group_mu + beta * self.group_sigma)
-        print(rec_idx)
+        # print(rec_idx)
         self.sample_groups[t,:] = self.A[rec_idx,:]
         # self.sample_groups[t, :] = xxx
 
@@ -223,7 +243,10 @@ class UCB(Pipeline):
             self.max_ucb(t)
             self.sample(t)
             self.update()     
-            
+
+        rec_idx = np.argmax(self.mu)
+        print('rec arm index: ', rec_idx, ' with mean: ', self.f_train[rec_idx])
+       
 # Test
 # We consider the same setting as shown in gpr_group_test.py
 
@@ -237,30 +260,47 @@ x_shift = 0
 # X_test_range_low = -3.5 + x_shift
 # X_test_range_high = 3.5 + x_shift
 
-X_train_range_low = -3. 
-X_train_range_high = 3. 
+X_train_range_low = -10. 
+X_train_range_high = 10. 
 
 budget = 50
-num_arms = 30
+num_arms = 100
 # num_train = X_train.shape[0]
-num_group = 5
+num_group = 10
 dim = 1
-noise = 1
-run_UCB = False
-run_SR = True
+group_noise = 1 # now group label only has group noise
+indi_noise = 0.1 
+run_UCB_Fixed_Group = True
+run_SR_Fixed_Group = True
+
+run_UCB_non_Group = True
+run_SR_non_Group = False
 
 # REVIEW: why we want a UCB type of algorithm? why does the uncertainty important? why we want to sample one arm multiple times?
 # ? when the space is too large too cover (# num_arms > # num_budget)
 # ? when the var of one arm is too large 
 
-if run_UCB:
-    ucb = UCB(budget = budget, num_arms = num_arms, num_group = num_group, group_method = 'kmeans', fixed_noise = None)
-    ucb.simulate()
-    ucb.evaluation()
+if run_UCB_Fixed_Group:
+    print('GP-UCB Fixed Group:')
+    ucb_fg = UCB_Fixed_Group(budget = budget, num_arms = num_arms, num_group = num_group, group_method = 'kmeans', noise = group_noise, fixed_noise = None)
+    ucb_fg.simulate()
+    ucb_fg.evaluation()
 
-if run_SR:
-    sr = SR(budget = budget, num_arms = num_arms, num_group = num_group, group_method = 'kmeans', fixed_noise = None)
-    sr.simulate()
-    sr.evaluation()
+if run_SR_Fixed_Group:
+    print('GP SR Fixed Group:')
+    sr_fg = SR_Fixed_Group(budget = budget, num_arms = num_arms, num_group = num_group, group_method = 'kmeans', noise = group_noise, fixed_noise = None)
+    sr_fg.simulate()
+    sr_fg.evaluation()
 
+if run_UCB_non_Group:
+    print('GP-UCB non group:')
+    ucb_ng = UCB_Fixed_Group(budget = budget, num_arms = num_arms, num_group = num_arms, group_method = 'identity', noise = indi_noise, fixed_noise = None)
+    ucb_ng.simulate()
+    ucb_ng.evaluation()
+
+if run_SR_non_Group:
+    print('GP SR non Group:')
+    sr_ng = SR_Fixed_Group(budget = budget, num_arms = num_arms, num_group = num_arms, group_method = 'identity', noise = indi_noise, fixed_noise = None)
+    sr_ng.simulate()
+    sr_ng.evaluation()
 

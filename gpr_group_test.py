@@ -102,13 +102,13 @@ def generate_A(grouping_method, num_group = 30):
         # TODO: does not work for now
         # Initialise the GP clusterer
         A = networks.MlpA(X_train.shape[1], num_group)
-        cluster = gp_ent_cluster.GPEntCluster(noise, num_group, X_train, X_train, A=A)
+        cluster = gp_ent_cluster.GPEntCluster(noise, num_group, X_train, X_test, A=A)
 
         # Minimise the entropy using gradient tape
         c = 0
         while c<=500:
             _, entropy = cluster.train_step(X_train, True, True)
-            A = cluster.A(X).numpy()
+            A = cluster.A(X_train).numpy()
             c += 1
         plt.matshow(np_A.T @ np_A)
         plt.savefig('group_kernel.pdf')
