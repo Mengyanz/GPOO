@@ -5,12 +5,12 @@ import matplotlib.tri as tri
 from matplotlib.cm import ScalarMappable as sm
 import numpy as np
 
-x_shift = 0
+# x_shift = 0
 
-X_train_range_low = -3. + x_shift
-X_train_range_high = 3. + x_shift
-X_test_range_low = -3. + x_shift
-X_test_range_high = 3. + x_shift
+# X_train_range_low = -3. + x_shift
+# X_train_range_high = 3. + x_shift
+# X_test_range_low = -3. + x_shift
+# X_test_range_high = 3. + x_shift
 
 # X_train_range_low = -10. + x_shift
 # X_train_range_high = 10. + x_shift
@@ -70,7 +70,8 @@ model_name = 'gprg', num_group = None, grouping_method = 'random', X_train_range
 
 def plot_2d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, A, 
 group_centers, group_test, group_test_pred, group_test_var, 
-model_name = 'gprg', num_group = None, grouping_method = 'random'):
+model_name = 'gprg', num_group = None, grouping_method = 'random',
+X_train_range_low = -3., X_train_range_high = 3., shift = 0):
     # counter plot, only for mean
     # refer https://matplotlib.org/3.1.1/gallery/images_contours_and_fields/irregulardatagrid.html#sphx-glr-gallery-images-contours-and-fields-irregulardatagrid-py
 
@@ -104,6 +105,8 @@ model_name = 'gprg', num_group = None, grouping_method = 'random'):
     z_test_pred_lcb = z_test_pred - 2 * np.sqrt(z_test_pred_var)
 
     # Create grid values first.
+    X_test_range_low = X_train_range_low
+    X_test_range_high = X_train_range_high
     xi = np.linspace(X_test_range_low, X_test_range_high, ngridx)
     yi = np.linspace(X_test_range_low, X_test_range_high, ngridy)
     Xi, Yi = np.meshgrid(xi, yi)

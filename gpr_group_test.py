@@ -16,7 +16,7 @@ import gp_ent_cluster
 import networks
 import utils
 
-np.random.seed(1996)
+# np.random.seed(1996)
 
 x_shift = 0
 
@@ -25,8 +25,8 @@ x_shift = 0
 # X_test_range_low = -3.5 + x_shift
 # X_test_range_high = 3.5 + x_shift
 
-X_train_range_low = -3. 
-X_train_range_high = 3. 
+X_train_range_low = -5. 
+X_train_range_high = 5. 
 # X_test_range_low = -10.5 
 # X_test_range_high = 10.5 
 
@@ -39,14 +39,14 @@ X_train_range_high = 3.
 # Y = np.sin(X) + np.random.randn(50,1)*0.05
 # X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.2, random_state = 4)
 
-num_train = 30
-num_test = 30
+num_train = 500
+num_test = 500
 # num_train = X_train.shape[0]
 # TODO: for now, assume num_train/num_group is integer
-num_group = 5
-noise = 1
+num_group = 25
+noise = 0.1
 num_element_in_group = int(num_train/num_group)
-dim = 1
+dim = 2
 
 # np.random.seed(1996)
 # X_train = np.random.uniform(-3.,3.,(num_train,1))
@@ -214,7 +214,7 @@ def run_gprg_online(A, A_ast = None):
 # plt.show()
 
 #-------------------------------------------------
-grouping_method = 'ent' # 'cluster' # 'similarY' # 
+grouping_method = 'cluster' # 'cluster' # 'similarY' # 
 A, group_centers = generate_A(grouping_method, num_group)
 print('group centers: ', group_centers)
 # A_ast = np.identity(Y_test.shape[0])
@@ -248,8 +248,8 @@ print('r2 score: ', r2_score_test)
 if dim == 1:
     plot_1d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, A, 
     group_centers, group_test, group_test_pred, group_test_var, 
-    'gprg', num_group, grouping_method)  
+    'gprg', num_group, grouping_method, X_train_range_low, X_train_range_high, x_shift)  
 if dim == 2:
     plot_2d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, A, 
     group_centers, group_test, group_test_pred, group_test_var,  
-    'gprg', num_group, grouping_method)
+    'gprg', num_group, grouping_method, X_train_range_low, X_train_range_high, x_shift)

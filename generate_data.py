@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 # Y = np.sin(X) + np.random.randn(50,1)*0.05
 # X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.2, random_state = 4)
 
-np.random.seed(1996)
+# np.random.seed(1996)
 # np.random.seed(0)
 
 # x_shift = 0

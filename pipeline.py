@@ -68,21 +68,21 @@ class Pipeline():
         # pred for group
         self.group_mu, self.group_sigma = self.gpg.predict(self.arms, A_ast = self.A)
 
-    def form_group(self):
+    def form_group(self, data, num_group):
         # construct matrix A \in R^{g * n}
         # each row represents one group
         # the arms in the group are set to 1, otherwise 0
         if self.group_method == 'kmeans':
-            kmeans = KMeans(n_clusters=self.num_group, init = 'k-means++', random_state= 0).fit(self.arms)
+            kmeans = KMeans(n_clusters=num_group, init = 'k-means++', random_state= 0).fit(data)
             group_idx = kmeans.labels_
-            A = np.zeros((self.num_group, self.num_arms))
+            A = np.zeros((num_group, data.shape[0]))
             for idx,i in enumerate(group_idx):
                 A[i, idx] = 1
             self.group_centers = kmeans.cluster_centers_
             return A
         elif self.group_method == 'identity':
-            self.group_centers = self.arms
-            return np.eye(N = self.num_arms)
+            self.group_centers = data
+            return np.eye(N = data.shape[0])
 
     def evaluation(self):
         # TODO: how to evaluate the pipeline?
@@ -100,9 +100,9 @@ class Pipeline():
         print('r2 score: ', r2_score(group_train, self.group_mu))
 
         
-        plot_1d(self.arms, self.arms, self.f_train, self.Y_train, self.f_train, self.Y_train, self.mu, self.sigma, self.A, 
-        self.group_centers, group_train, self.group_mu, self.group_sigma, 
-        'gprg', self.num_group, grouping_method = 'kmeans')  
+        # plot_1d(self.arms, self.arms, self.f_train, self.Y_train, self.f_train, self.Y_train, self.mu, self.sigma, self.A, 
+        # self.group_centers, group_train, self.group_mu, self.group_sigma, 
+        # 'gprg', self.num_group, grouping_method = 'kmeans')  
         
 # 20210315：
 # We implement SR in pipeline:
@@ -143,7 +143,7 @@ class SR_Fixed_Group(Pipeline):
     def simulate(self):
         """Simulate experiments. 
         """
-        self.A = self.form_group()
+        self.A = self.form_group(self.arms, self.num_group)
 
         n_last_phase = 0 # n_0
         # sample_count = 0
@@ -236,7 +236,7 @@ class UCB_Fixed_Group(Pipeline):
 
     def simulate(self):
         # REVIEW: for now we keep the group fixed 
-        self.A = self.form_group()
+        self.A = self.form_group(self.arms, self.num_group)
 
         for t in range(budget):
             # all our rec and sample are in group level
@@ -260,16 +260,16 @@ x_shift = 0
 # X_test_range_low = -3.5 + x_shift
 # X_test_range_high = 3.5 + x_shift
 
-X_train_range_low = -10. 
-X_train_range_high = 10. 
+X_train_range_low = -5. 
+X_train_range_high = 5. 
 
 budget = 50
-num_arms = 100
+num_arms = 500
 # num_train = X_train.shape[0]
-num_group = 10
-dim = 1
-group_noise = 1 # now group label only has group noise
-indi_noise = 0.1 
+num_group = 25
+dim = 2
+group_noise = 0.1 # now group label only has group noise
+indi_noise = 0.1
 run_UCB_Fixed_Group = True
 run_SR_Fixed_Group = True
 
