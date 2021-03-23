@@ -27,7 +27,7 @@ from generate_data import generate_data_func
 class Pipeline():
     """GPR-G + form group by cluster + bandits algorithm (UCB/SR)
     """
-    def __init__(self, budget, num_arms, num_group, group_method = 'kmeans', noise = 0.1, fixed_noise = None):
+    def __init__(self, budget, num_arms, num_group, group_method = 'kmeans', noise = 0.1, fixed_noise = None, dynamic_grouping = False):
         # TODO: implement fixed_noise 
         self.budget = budget
         self.num_arms = num_arms
@@ -35,8 +35,12 @@ class Pipeline():
         self.fixed_noise = fixed_noise
         self.group_method = group_method
         self.noise = noise
+        self.dynamic_grouping = dynamic_grouping
 
         self.arms, self.f_train, self.Y_train = generate_data_func(self.num_arms ,self.num_arms ,dim=dim, X_train_range_low = X_train_range_low, X_train_range_high = X_train_range_high, x_shift = x_shift, func_type='sin')
+        # self.idx_arms_dict = self.generate_idx_arms(self.arms)
+        # print(self.idx_arms_dict)
+        self.active_arm_idx = set(list(range(self.num_arms)))
 
         # choose RBF as default
         self.kernel = GPy.kern.RBF(input_dim=dim, variance=1., lengthscale=1.)
@@ -45,6 +49,17 @@ class Pipeline():
         self.mu = np.zeros((self.num_arms,))
         self.sigma = np.ones((self.num_arms,))
         self.rewards = []
+
+    # def generate_idx_arms(self, arms):
+    #     idx_arms_dict = {}
+    #     for idx, arm in enumerate(arms):
+    #         # print(arm)
+    #         arm = str(arm)
+    #         arm = list(arm)
+    #         print(arm)
+    #         idx_arms_dict[idx] = arm
+    #         idx_arms_dict[arm] = idx
+    #     return idx_arms_dict
 
     def sample(self, t):
         # sample group reward and add it into rewards record
@@ -68,17 +83,27 @@ class Pipeline():
         # pred for group
         self.group_mu, self.group_sigma = self.gpg.predict(self.arms, A_ast = self.A)
 
-    def form_group(self, data, num_group):
+    def form_group(self, num_group):
         # construct matrix A \in R^{g * n}
         # each row represents one group
         # the arms in the group are set to 1, otherwise 0
+
+        # print(self.active_arm_idx)
+        sorted_active_arm_idx = np.asarray(np.sort(list(self.active_arm_idx)))
+        data = self.arms[sorted_active_arm_idx,:]
         if self.group_method == 'kmeans':
             kmeans = KMeans(n_clusters=num_group, init = 'k-means++', random_state= 0).fit(data)
             group_idx = kmeans.labels_
-            A = np.zeros((num_group, data.shape[0]))
-            for idx,i in enumerate(group_idx):
-                A[i, idx] = 1
+            A = np.zeros((num_group, self.num_arms))   
+            for i, idx in enumerate(sorted_active_arm_idx):
+                A[group_idx[i], idx] = 1
+
+            # check whether we need to change group centers code
             self.group_centers = kmeans.cluster_centers_
+
+            if self.dynamic_grouping:
+                # print('chaning group idx.')
+                self.active_group_idx = set(list(range(num_group)))
             return A
         elif self.group_method == 'identity':
             self.group_centers = data
@@ -93,11 +118,12 @@ class Pipeline():
         # print('Y train: ', self.Y_train)
         # print('mu: ', self.mu)
         print('r2 score: ', r2_score(self.Y_train, self.mu))
-
-        print('Prediction for group (select A_ast = A):')
-        group_train = self.A.dot(self.Y_train)
-        print('mean squared error: ', mean_squared_error(group_train, self.group_mu))
-        print('r2 score: ', r2_score(group_train, self.group_mu))
+        
+        if not self.dynamic_grouping:
+            print('Prediction for group (select A_ast = A):')
+            group_train = self.A.dot(self.Y_train)
+            print('mean squared error: ', mean_squared_error(group_train, self.group_mu))
+            print('r2 score: ', r2_score(group_train, self.group_mu))
 
         
         # plot_1d(self.arms, self.arms, self.f_train, self.Y_train, self.f_train, self.Y_train, self.mu, self.sigma, self.A, 
@@ -112,13 +138,14 @@ class Pipeline():
 # 4. another (open) questions is: how to deal with arm set which are changing (I imagine in our setting, later on we would like to dynamic form the groups)? Now in SR, the sample size is pre-allocated so only works for fixed set of arms. 
 
 class SR_Fixed_Group(Pipeline):
-    def __init__(self, budget, num_arms, num_group, group_method = 'kmeans', noise = 0.1, fixed_noise = None):
-        super().__init__(budget, num_arms, num_group, group_method, noise, fixed_noise)
+    def __init__(self, budget, num_arms, num_group, group_method = 'kmeans', noise = 0.1, fixed_noise = None, dynamic_grouping = False):
+        super().__init__(budget, num_arms, num_group, group_method, noise, fixed_noise, dynamic_grouping)
         self.barlogK = 1.0/(1.0 + 1)
         # REVIEW: for now, we form the "arm" of pre-defined fixed groups
         for i in range(1, self.num_group):
             self.barlogK += 1.0/(self.num_group + 1 - i)
-        self.active_set = set(list(range(self.num_group)))
+        self.active_group_idx = set(list(range(self.num_group))) # for active groups
+        # print('init:', self.active_group_idx)
 
     def cal_n_p(self,p):
         """Calculate n_p, the number of samples of each arm for phase p
@@ -143,7 +170,7 @@ class SR_Fixed_Group(Pipeline):
     def simulate(self):
         """Simulate experiments. 
         """
-        self.A = self.form_group(self.arms, self.num_group)
+        self.A = self.form_group(self.num_group)
 
         n_last_phase = 0 # n_0
         # sample_count = 0
@@ -154,44 +181,55 @@ class SR_Fixed_Group(Pipeline):
 
             # print('phase: ', p)
             # print('num_samples: ', num_samples)
-            # print('active set: ', len(self.active_set))
-            # sample_count += num_samples * len(self.active_set)
+            # print('active set: ', len(self.active_group_idx))
+            # sample_count += num_samples * len(self.active_group_idx)
             # print('sample count: ', sample_count)
             # print('num samples: ', num_samples)
             # step 1
-            for i in self.active_set:
+            for i in self.active_group_idx:
                 for j in range(num_samples):
                     # REVIEW: keep the same structure in pipeline 
                     self.sample_groups[t,:] = self.A[i,:]
                     self.sample(t)
                     t += 1
             self.update()
+            # print('active set: ', self.active_group_idx)
             
             # print('group mu: ', self.group_mu)
             # TODO: remove the smallest one in active set
             group_mu = self.group_mu.copy()
             while True:
                 min_idx = np.argmin(group_mu.reshape(len(group_mu),))
-                if min_idx in self.active_set:
-                    self.active_set.remove(min_idx)
+                if min_idx in self.active_group_idx:
+                    # remove the rejected group 
+                    self.active_group_idx.remove(min_idx)
+                    # remove all arms in the reject group
+                    for arm_idx, indicator in enumerate(self.A[min_idx,:]):
+                        if indicator == 1:
+                            self.active_arm_idx.remove(arm_idx)
                     break
                 else:
                     group_mu[min_idx] = 1e5 # set to a very large value
 
+            if self.dynamic_grouping:
+                # TODO: does not work for now
+                self.A = self.form_group(self.num_group - p)
+
             # sorted_group_mu_idx = np.argsort(self.group_mu.reshape(self.num_group,))
             # print('sorted group mu idx: ', sorted_group_mu_idx)
             # for i, idx in enumerate(np.sort(sorted_group_mu_idx)[::-1]):
-            #     if idx in self.active_set:
+            #     if idx in self.active_group_idx:
             #         # remove the group in active set with smallest pred mean
             #         print('remove idx: ', i)
-            #         self.active_set.remove(i)
+            #         self.active_group_idx.remove(i)
             #         break
                 
-            # print('active set: ', self.active_set)
+            
 
             n_last_phase = n_current_phase
 
-        self.rec_set = self.active_set
+        self.rec_set = self.active_group_idx
+        # print(self.rec_set)
         print(np.asarray(self.f_train)[np.asarray(self.A[np.asarray(list(self.rec_set))][0], dtype=bool)])
         # only works for 1.0 = 1
         assert len(self.rec_set) == 1.0
@@ -236,7 +274,7 @@ class UCB_Fixed_Group(Pipeline):
 
     def simulate(self):
         # REVIEW: for now we keep the group fixed 
-        self.A = self.form_group(self.arms, self.num_group)
+        self.A = self.form_group(self.num_group)
 
         for t in range(budget):
             # all our rec and sample are in group level
@@ -263,17 +301,17 @@ x_shift = 0
 X_train_range_low = -5. 
 X_train_range_high = 5. 
 
-budget = 50
-num_arms = 500
+budget = 100
+num_arms = 200
 # num_train = X_train.shape[0]
-num_group = 25
+num_group = 50
 dim = 2
 group_noise = 0.1 # now group label only has group noise
 indi_noise = 0.1
-run_UCB_Fixed_Group = True
-run_SR_Fixed_Group = True
-
+run_UCB_Fixed_Group = False
 run_UCB_non_Group = True
+run_SR_Fixed_Group = True
+run_SR_Dynamic_Group = True
 run_SR_non_Group = False
 
 # REVIEW: why we want a UCB type of algorithm? why does the uncertainty important? why we want to sample one arm multiple times?
@@ -286,17 +324,26 @@ if run_UCB_Fixed_Group:
     ucb_fg.simulate()
     ucb_fg.evaluation()
 
+if run_UCB_non_Group:
+    print('GP-UCB non group:')
+    ucb_ng = UCB_Fixed_Group(budget = budget, num_arms = num_arms, num_group = num_arms, group_method = 'identity', noise = indi_noise, fixed_noise = None)
+    ucb_ng.simulate()
+    ucb_ng.evaluation()
+
 if run_SR_Fixed_Group:
     print('GP SR Fixed Group:')
     sr_fg = SR_Fixed_Group(budget = budget, num_arms = num_arms, num_group = num_group, group_method = 'kmeans', noise = group_noise, fixed_noise = None)
     sr_fg.simulate()
     sr_fg.evaluation()
 
-if run_UCB_non_Group:
-    print('GP-UCB non group:')
-    ucb_ng = UCB_Fixed_Group(budget = budget, num_arms = num_arms, num_group = num_arms, group_method = 'identity', noise = indi_noise, fixed_noise = None)
-    ucb_ng.simulate()
-    ucb_ng.evaluation()
+if run_SR_Dynamic_Group:
+    print('GP SR Dynamic Group:')
+    sr_fg = SR_Fixed_Group(
+        budget = budget, num_arms = num_arms, num_group = num_group, group_method = 'kmeans', 
+        noise = group_noise, fixed_noise = None, dynamic_grouping = True
+        )
+    sr_fg.simulate()
+    sr_fg.evaluation()
 
 if run_SR_non_Group:
     print('GP SR non Group:')
