@@ -20,6 +20,7 @@ class PosteriorExactGroup(PosteriorExact):
         if len(mu.shape) == 1:
             mu = mu.reshape(-1, 1)
         if full_cov:
+            # REVIEW: do we need to dot product A_ast again?s
             Kxx = kern.K(Xnew)
             if self._woodbury_chol.ndim == 2:
                 tmp = dtrtrs(self._woodbury_chol, Kx)[0]

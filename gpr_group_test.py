@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt
 from gpr_group_model import GPRegression_Group
-from generate_data import generate_data_func
+from generate_data import generate_data_func, generate_data_normal
 from plot import plot_1d, plot_2d
 from sklearn.cluster import KMeans
 
@@ -25,8 +25,8 @@ x_shift = 0
 # X_test_range_low = -3.5 + x_shift
 # X_test_range_high = 3.5 + x_shift
 
-X_train_range_low = -5. 
-X_train_range_high = 5. 
+X_train_range_low = -1.5 # -5. 
+X_train_range_high = 1.5 # 5. 
 # X_test_range_low = -10.5 
 # X_test_range_high = 10.5 
 
@@ -39,14 +39,14 @@ X_train_range_high = 5.
 # Y = np.sin(X) + np.random.randn(50,1)*0.05
 # X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.2, random_state = 4)
 
-num_train = 500
-num_test = 500
+num_train = 10 # 500
+num_test = 10 # 500
 # num_train = X_train.shape[0]
 # TODO: for now, assume num_train/num_group is integer
-num_group = 25
+num_group = 1 # 25
 noise = 0.1
 num_element_in_group = int(num_train/num_group)
-dim = 2
+dim = 1
 
 # np.random.seed(1996)
 # X_train = np.random.uniform(-3.,3.,(num_train,1))
@@ -124,6 +124,17 @@ def generate_A(grouping_method, num_group = 30):
         for idx,i in enumerate(group_idx):
             A[i, idx] = 1
         group_centers = kmeans.cluster_centers_
+    elif grouping_method == 'clusterXY':
+        from sklearn.preprocessing import StandardScaler
+        cluster_features = np.concatenate((X_train,Y_train), axis = 1)
+        cluster_features = StandardScaler().fit_transform(cluster_features)
+        print(cluster_features)
+        
+        kmeans = KMeans(n_clusters=num_group, init = 'k-means++', random_state= 0).fit(cluster_features)
+        group_idx = kmeans.labels_
+        for idx,i in enumerate(group_idx):
+            A[i, idx] = 1
+        group_centers = kmeans.cluster_centers_
     elif grouping_method == 'evenly':
         group_idx = 0
         sorted_train_idx = np.argsort(X_train, axis = 0).reshape(X_train.shape[0],)
@@ -160,6 +171,7 @@ def generate_A(grouping_method, num_group = 30):
 
 def run_gprg(A, A_ast = None):
     # TODO: at some time, we want to introduce noise for individual level as well
+    num_group = A.shape[0]
     Y_group = A.dot(f_train) + np.random.randn(num_group,1) * noise
     # Y_group = A.dot(Y_train)
 
@@ -170,7 +182,7 @@ def run_gprg(A, A_ast = None):
     # m.optimize(messages=False,max_f_eval = 1000)
     # m.optimize_restarts(num_restarts = 10)
 
-    Y_test_pred, Y_test_var = m.predict(X_test, A_ast=A_ast)
+    Y_test_pred, Y_test_var = m.predict(X_test, A_ast=A_ast, full_cov = False)
 
     return Y_test_pred, Y_test_var
 
@@ -213,10 +225,10 @@ def run_gprg_online(A, A_ast = None):
 # ax[1].set_title('Y_test_var_diagonal - Y_test_var_ortho hist')
 # plt.show()
 
+# num_train+=1
+# num_test+=1
 #-------------------------------------------------
-grouping_method = 'cluster' # 'cluster' # 'similarY' # 
-A, group_centers = generate_A(grouping_method, num_group)
-print('group centers: ', group_centers)
+
 # A_ast = np.identity(Y_test.shape[0])
 
 # Y_test_pred, Y_test_var = run_gprg_online(A)
@@ -226,30 +238,97 @@ print('group centers: ', group_centers)
 # print('test var: ', Y_test_var)
 
 #---------------------------------------------------------
-print('Prediction for individual:')
-Y_test_pred, Y_test_var = run_gprg_online(A, np.identity(Y_test.shape[0]))
+print('GPR:')
+Y_test_pred, Y_test_var = run_gprg(np.identity(Y_test.shape[0]))
 # print('Y test: ', Y_test)
-# print('Y test pred: ', Y_test_pred)
-mse_test = mean_squared_error(Y_test, Y_test_pred)
-print('mean squared error: ', mse_test)
-r2_score_test = r2_score(Y_test, Y_test_pred)
-print('r2 score: ', r2_score_test)
+# print('Y test var: ', Y_test_var)
+# mse_test = mean_squared_error(Y_test, Y_test_pred)
+# print('mean squared error: ', mse_test)
+# r2_score_test = r2_score(Y_test, Y_test_pred)
+# print('r2 score: ', r2_score_test)
 #---------------------------------------------------------
 # TODO: extend the evaluation into A_ast != A
-print('Prediction for group (select A_ast = A):')
-group_test = A.dot(Y_test)
-print(group_test)
-group_test_pred, group_test_var = run_gprg_online(A, A)
-mse_test = mean_squared_error(group_test, group_test_pred)
-print('mean squared error: ', mse_test)
-r2_score_test = r2_score(group_test, group_test_pred)
-print('r2 score: ', r2_score_test)
+print('GPR-G1:')
+grouping_method = 'cluster' # 'cluster' # 'similarY' # 
+A, group_centers = generate_A(grouping_method, 1)
+print('group centers: ', group_centers)
 
-if dim == 1:
-    plot_1d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, A, 
-    group_centers, group_test, group_test_pred, group_test_var, 
-    'gprg', num_group, grouping_method, X_train_range_low, X_train_range_high, x_shift)  
-if dim == 2:
-    plot_2d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, A, 
-    group_centers, group_test, group_test_pred, group_test_var,  
-    'gprg', num_group, grouping_method, X_train_range_low, X_train_range_high, x_shift)
+group_test = A.dot(Y_test)
+group_test_pred, group_test_var = run_gprg(A)
+# print(group_test_var.reshape(-1,).shape)
+# print(X_test)
+# print(X_test.shape)
+print('group test var: ', run_gprg(A, A)[1])
+#-------------------------------------------------
+# TODO: extend the evaluation into A_ast != A
+print('GPR-G2-cluster:')
+
+grouping_method = 'cluster' # 'cluster' # 'similarY' # 
+A2, group_centers2 = generate_A(grouping_method, 2)
+print('group centers: ', group_centers2)
+
+# print('Prediction for group (select A_ast = A):')
+group_test2 = A2.dot(Y_test)
+group_test_pred2, group_test_var2 = run_gprg(A2)
+print('group test var: ', run_gprg(A2, A2)[1])
+# print(group_test_var.reshape(-1,).shape)
+# print(X_test)
+# print(X_test.shape)
+# print('group test var: ', group_test_var)
+#-------------------------------------------------
+# TODO: extend the evaluation into A_ast != A
+print('GPR-G2-evenly:')
+
+grouping_method = 'evenly' # 'cluster' # 'similarY' # 
+A3, group_centers3 = generate_A(grouping_method, 2)
+print('group centers: ', group_centers3)
+
+# print('Prediction for group (select A_ast = A):')
+group_test3 = A3.dot(Y_test)
+group_test_pred3, group_test_var3 = run_gprg(A3)
+print('group test var: ', run_gprg(A3, A3)[1])
+#---------------------------------------------------
+alpha = 0.5
+
+fig, axes = plt.subplots(1,2,figsize=(10,5))
+
+axes[0].scatter(X_test, Y_test_var, label = 'GPR', alpha = alpha)
+axes[0].scatter(X_test, group_test_var, label = 'GPR-G1', alpha = alpha)
+axes[0].scatter(X_test, group_test_var2, label = 'GPR-G2-cluster', alpha = alpha)
+axes[0].scatter(X_test, group_test_var3, label = 'GPR-G2-evenly', alpha = alpha)
+axes[0].legend()
+axes[0].set_title('var')
+# plt.show()
+
+
+axes[1].scatter(X_test, Y_test_pred, label = 'GPR', alpha = alpha)
+axes[1].scatter(X_test, group_test_pred, label = 'GPR-G1', alpha = alpha)
+axes[1].scatter(X_test, group_test_pred2, label = 'GPR-G2-cluster', alpha = alpha)
+axes[1].scatter(X_test, group_test_pred3, label = 'GPR-G2-evenly', alpha = alpha)
+axes[1].scatter(X_test, Y_test, label = 'True', alpha = alpha)
+axes[1].legend()
+axes[1].set_title('mean')
+
+# plt.show()
+plt.savefig('comparison.png')
+
+
+# fig, axes = plt.subplots(nrows=2, ncols=2)
+# # for ax in axes.flat:
+# im1 = axes[0,0].imshow(Y_test_var, vmin=0, vmax=1)
+# im2 = axes[0,1].imshow(group_test_var, vmin=0, vmax=1)
+# im3 = axes[1,0].imshow(Y_test_var - group_test_var, vmin=0, vmax=1)
+
+# fig.subplots_adjust(right=0.8)
+# cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+# fig.colorbar(im1, cax=cbar_ax)
+
+
+# if dim == 1:
+#     plot_1d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, A, 
+#     group_centers, group_test, group_test_pred, group_test_var, 
+#     'gprg', num_group, grouping_method, X_train_range_low, X_train_range_high, x_shift)  
+# if dim == 2:
+#     plot_2d(X_train, X_test, f_train, Y_train, f_test, Y_test, Y_test_pred, Y_test_var, A, 
+#     group_centers, group_test, group_test_pred, group_test_var,  
+#     'gprg', num_group, grouping_method, X_train_range_low, X_train_range_high, x_shift)

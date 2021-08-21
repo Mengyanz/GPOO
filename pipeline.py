@@ -9,6 +9,7 @@ from plot import plot_1d, plot_2d
 from sklearn.cluster import KMeans
 # from gpr_group_test import generate_A, run_gprg
 from generate_data import generate_data_func
+from sklearn.preprocessing import StandardScaler
 
 # np.random.seed(1996)
 
@@ -91,8 +92,13 @@ class Pipeline():
         # print(self.active_arm_idx)
         sorted_active_arm_idx = np.asarray(np.sort(list(self.active_arm_idx)))
         data = self.arms[sorted_active_arm_idx,:]
+        label = self.mu.reshape(self.mu.shape[0], 1)[sorted_active_arm_idx,:]
         if self.group_method == 'kmeans':
-            kmeans = KMeans(n_clusters=num_group, init = 'k-means++', random_state= 0).fit(data)
+            cluster_features = np.concatenate((data, label), axis = 1)
+            cluster_features = StandardScaler().fit_transform(cluster_features)
+            # cluster_features = data
+
+            kmeans = KMeans(n_clusters=num_group, init = 'k-means++', random_state= 0).fit(cluster_features)
             group_idx = kmeans.labels_
             A = np.zeros((num_group, self.num_arms))   
             for i, idx in enumerate(sorted_active_arm_idx):

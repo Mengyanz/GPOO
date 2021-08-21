@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 # X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.2, random_state = 4)
 
 # np.random.seed(1996)
-# np.random.seed(0)
+np.random.seed(0)
 
 # x_shift = 0
 
@@ -31,7 +31,11 @@ def generate_data_func(num_train = 40, num_test = 100, dim = 1, func_type = 'sin
 
     # uniformly discretize the continuous space
     X_train = np.random.uniform(X_train_range_low + x_shift, X_train_range_high+x_shift,(num_train,dim))
+    # num_train +=1
+    # X_train = np.append(X_train, X_train[0]).reshape((num_train,dim))
     X_test = np.random.uniform(X_train_range_low  +x_shift, X_train_range_high +x_shift,(num_test,dim))
+    # num_test +=1
+    # X_test = np.append(X_test, X_test[0]).reshape((num_test,dim))
 
     if dim == 1:
         if func_type == 'sin':
@@ -62,3 +66,17 @@ def generate_data_func(num_train = 40, num_test = 100, dim = 1, func_type = 'sin
     else:
         return X_train, f_train, Y_train, X_test, f_test, Y_test
 
+def generate_data_normal(num_train = 40, num_test = 100, dim = 1, func_type = 'sin', X_train_range_low = -3., X_train_range_high = 3., x_shift = 0):
+    
+    num_group = 4
+    c1 = np.random.normal(0, 0.2, (int(num_train/num_group), 2))
+    c2 = np.random.normal(-1, 0.2, (int(num_train/num_group), 2))
+    c3 = np.random.normal(1, 0.2, (int(num_train/num_group), 2))
+    theta = np.linspace(0, 2*np.pi, 100)
+    c4 = np.hstack((np.cos(theta).reshape(int(num_train/num_group),1), np.sin(theta).reshape(100,1)))    
+
+    X = np.vstack((c1, c2, c3, c4))
+    if func_type == 'sin':
+        f = np.sin(X[:,0:1]) * np.sin(X[:,1:2])
+        Y = f
+    return X, f, Y
