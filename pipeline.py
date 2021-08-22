@@ -21,10 +21,6 @@ from sklearn.preprocessing import StandardScaler
 # Goal: Recommend the best group.
 # Baseline: groups are randomly chosen.
 
-# 20210306: 
-# why do we need to repeatedly select one group?
-# maybe it makes more sense to have noise included for individual level
-
 class Pipeline():
     """GPR-G + form group by cluster + bandits algorithm (UCB/SR)
     """
@@ -78,6 +74,7 @@ class Pipeline():
             self.kernel, noise_var=0.005, A = self.sample_groups[:num_sample,:].reshape(num_sample, self.num_arms))
         else:
             self.gpg.set_XY_group(X=self.arms, Y= np.asarray(self.rewards).reshape(num_sample,1), A= self.sample_groups[:num_sample,:].reshape(num_sample, self.num_arms))
+        self.gpg.optimize(messages = True)
 
         # pred for indi
         self.mu, self.sigma = self.gpg.predict(self.arms)

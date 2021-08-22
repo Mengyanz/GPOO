@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import GPy
 from numpy.lib.function_base import select
+from gpr_group_model import GPRegression_Group
 
 np.random.seed(2021)
 
@@ -20,7 +21,8 @@ class DOO():
     http://www.nowpublishers.com/articles/foundations-and-trends-in-machine-learning/MAL-038
     Fig 3.6 
     """
-    def __init__(self, arms_range, f, delta, k, n, reward_type = 'center') -> None:
+    def __init__(self, arms_range, f, delta, k, n, reward_type = 'center', d = 1) -> None:
+        self.d = d # feature dim
         self.arms = arms_range # 1d continuous arm feature range
         self.f = f # the function to be optimised, take arm feature as argument
         self.delta = delta # upper bound of diameters, a func of h
@@ -91,8 +93,8 @@ class DOO():
         return self.evaluated_nodes[np.argmax(self.evaluated_fs)]
 
 class StoOO(DOO):
-    def __init__(self, arms_range, f, delta, k, n, reward_type = 'center', eta = 0.1) -> None:
-        super().__init__(arms_range, f, delta, k, n, reward_type=reward_type)
+    def __init__(self, arms_range, f, delta, k, n, reward_type = 'center', d = 1, eta = 0.1) -> None:
+        super().__init__(arms_range, f, delta, k, n, reward_type=reward_type, d)
         self.eta = eta # error probability
 
         self.T_dict = {} # key: node, value: number of times have been drawn
@@ -149,14 +151,23 @@ class StoOO(DOO):
 
 
 class GPStoOO(StoOO):
-    def __init__(self, arms_range, f, delta, k, n, reward_type = 'center', eta = 0.1) -> None:
-        super().__init__(arms_range, f, delta, k, n, reward_type, eta)
+    def __init__(self, arms_range, f, delta, k, n, reward_type = 'center', d = 1, eta = 0.1) -> None:
+        super().__init__(arms_range, f, delta, k, n, reward_type, d, eta)
         self.kernel = GPy.kern.RBF(input_dim=1, variance=1., lengthscale=1.)
+        self.reward_type = reward_type 
         
         root_feature = np.array([self.root.data]).reshape(1,1) # TODO: might need to extend to multi-dim
         root_reward = np.array([self.reward(self.root)]).reshape(1,1)
-        self.m = GPy.models.GPRegression(root_feature, root_reward, self.kernel)
+        self.m = GPRegression_Group(root_feature, root_reward, self.kernel)
         self.bvalues[self.root] = self.bvalue(self.root, 0, reward=root_reward)
+
+    def set_A(self)
+        if self.reward_type == 'center':
+            A = np.identity(self.n)
+        elif self.reward_type == 'ave':
+            A =  np.zeros((self.n, self.n * self.k))
+        else:
+            raise Exception("Invalid reward type. Only center or ave is accepted.")
 
     def update_posterior(self, x, y):
         x = np.array([x]).reshape(1,1)

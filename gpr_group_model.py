@@ -26,6 +26,7 @@ class GPRegression_Group(GP):
     :param A: g * n group indicator matrix
         if it is Non, then it is initialized as identity matrix (n * n),
         then it is the same as GPR.
+        # REVIEW: to be consistent as the paper, A_t is t * tK matrix
 
     .. Note:: Multiple independent outputs are allowed using columns of Y
 
@@ -65,7 +66,6 @@ class GPRegression_Group(GP):
 
     def parameters_changed(self):
         """
-        TODO: to be changed
         Method that is called upon any changes to :class:`~GPy.core.parameterization.param.Param` variables within the model.
         In particular in the GP class this method re-performs inference, recalculating the posterior and log marginal likelihood and gradients of the model
 
@@ -75,9 +75,8 @@ class GPRegression_Group(GP):
         """
         # print('GPRG trigger parameters changed.')
         self.posterior, self._log_marginal_likelihood, self.grad_dict = self.inference_method.inference(self.kern, self.X, self.likelihood, self.Y_normalized, self.mean_function, self.Y_metadata, A = self.A)
-        # REVIEW: whether we need to change likelihood (Gaussian), kern, mean_function class?
+        # REVIEW: might need to change likelihood (Gaussian), kern, mean_function later
         self.likelihood.update_gradients(self.grad_dict['dL_dthetaL'])
-        # FIXME: gradient need change!
         self.kern.update_gradients_full(self.grad_dict['dL_dK'], self.X)
         if self.mean_function is not None:
             self.mean_function.update_gradients(self.grad_dict['dL_dm'], self.X)
@@ -86,6 +85,7 @@ class GPRegression_Group(GP):
         """
             Set the input / output data of the model
             This is useful if we wish to change our existing data but maintain the same model
+            # NOTE: this only provides update X,Y,A, but does not provides sequential updates. The input should be ALL previous data points, instead of only current round's data point.  
 
             :param X: input observations
             :type X: np.ndarray
@@ -134,12 +134,16 @@ class GPRegression_Group(GP):
 
     def _raw_predict(self, Xnew, A_ast = None, full_cov=False, kern=None):
         """
-        TODO: to be changed
         For making predictions, does not account for normalization or likelihood
 
         full_cov is a boolean which defines whether the full covariance matrix
         of the prediction is computed. If full_cov is False (default), only the
         diagonal of the covariance is returned.
+
+        :param Xnew: The points at which to make a prediction
+        :type Xnew: np.ndarray (Nnew x self.input_dim)
+        :param A_ast: group operator (enable predictions for group)
+        :type A_ast: np.ndarray (Ngroup x Nnew)
 
         .. math::
             p(f*|X*, X, Y) = \int^{\inf}_{\inf} p(f*|f,X*)p(f|X,Y) df
@@ -149,13 +153,15 @@ class GPRegression_Group(GP):
         mu, var = self.posterior._raw_predict(kern=self.kern if kern is None else kern, Xnew=Xnew, A_ast = A_ast, pred_var=self._predictive_variable, full_cov=full_cov)
         if self.mean_function is not None:
             # mu += self.mean_function.f(Xnew)
-            mu += A_ast.dot(self.mean_function.f(Xnew))
+            if A_ast is not None:
+                mu += A_ast.dot(self.mean_function.f(Xnew))
+            else: 
+                mu += self.mean_function.f(Xnew)
         return mu, var
 
     def predict(self, Xnew, A_ast = None, full_cov=False, Y_metadata=None, kern=None,
                 likelihood=None, include_likelihood=True):
         """
-        TODO: to be changed
         Predict the function(s) at the new point(s) Xnew. This includes the
         likelihood variance added to the predicted underlying function
         (usually referred to as f).
@@ -197,6 +203,7 @@ class GPRegression_Group(GP):
         # Predict the latent function values
         mean, var = self._raw_predict(Xnew, A_ast, full_cov=full_cov, kern=kern)
 
+        # REVIEW: For group, we didn't change the following codes
         if include_likelihood:
             # now push through likelihood
             if likelihood is None:
