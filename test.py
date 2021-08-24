@@ -22,5 +22,20 @@ m.set_XY(X2,Y2)
 print(m.predict(X))
 
 
+def chunks(lst, n):
+    """Yield successive n-sized chunks from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
+        
+print(list(chunks(range(10, 75), 10)))
+
+for i in list(chunks(range(10, 75), 10)):
+    print(i[-1])
+
+print(np.asarray([[0,1], [1,2], [2,3]]).shape)
+
+print(np.linspace(0, 9, num = 10 + 1))
+
+print(np.random.normal(0,0))
 
 
