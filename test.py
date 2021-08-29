@@ -4,6 +4,22 @@ import pretty_errors
 import matplotlib.pyplot as plt
 # GPy.plotting.change_plotting_library('plotly')
 
+
+def beta(t = 1):
+    # return 0.5 * np.log(t)
+    return 0.1 * np.log(np.pi**2 * t**2/(6 * 0.1))
+    # return 1
+
+beta_list = []
+for t in range(1,50):
+    beta_list.append(beta(t))
+
+plt.plot(range(1,50), beta_list)
+plt.show()
+
+
+raise Exception
+
 np.random.seed(2021)
 sample_size = 5
 size = 3

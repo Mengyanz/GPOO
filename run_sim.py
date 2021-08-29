@@ -5,7 +5,8 @@ import GPy
 from numpy.lib.function_base import select
 from gpr_group_model import GPRegression_Group
 import pretty_errors
-from DOO import * 
+from simulation import * 
+import pretty_errors
 
 np.random.seed(2021)
 
@@ -13,10 +14,10 @@ np.random.seed(2021)
 # reproduce Fig 3.7
 
 run_DOO = False
-run_StoOO = True
-run_GPStoOO = False
+run_StoOO = False
+run_GPOO = True
 
-n = 100
+n = 50
 k = 2
 arms_range = [0.0, 1.0]
 reward_type = 'center'
@@ -26,7 +27,8 @@ def f(x):
     return (np.sin(13.0 * x) * np.sin(27.0*x) + 1)/2.0
 
 def delta1(h):
-    return 14.0 * 2**(-h)
+    # return 14.0 * 2**(-h)
+    return 14 * 2**(-h)
 
 def delta2(h):
     return 222.0 * 2**(-2.0 * h)
@@ -108,37 +110,37 @@ if run_StoOO:
     # plot(arms_range, f, doo2, 'doo2')
     plot_two(arms_range, f, sto1, sto2, 'StoOO center v.s. ave')
 
-
-if run_GPStoOO:
-    sto1 = GPStoOO(
+if run_GPOO:
+    gpoo1 = GPOO(
         f=f, delta=delta1, root_cell=arms_range, n=n, k=k, d=1, s=1, reward_type = 'center', sigma = 0.1, eta=0.1
         )
 
-    rec_sto1 = sto1.rec()
-    print(rec_sto1.features)
-    print(rec_sto1.depth)
+    rec_gpoo1 = gpoo1.rec()
+    print(rec_gpoo1.features)
+    print(rec_gpoo1.depth)
+
     # print([node.features for node in doo1.evaluated_nodes])
     # print(doo1.evaluated_fs)
     # print()
 
-    sto2 = GPStoOO(
+    gpoo2 = GPOO(
         f=f, delta=delta1, root_cell=arms_range, n=n, k=k, d=1, s=10, reward_type = 'ave', sigma = 0.1, eta=0.1
     )
     # doo2 = DOO(arms_range, f, delta2, k, n, reward_type)
 
-    rec_sto2 = sto2.rec()
-    print(rec_sto2.features)
-    print(rec_sto2.depth)
+    rec_gpoo2 = gpoo2.rec()
+    print(rec_gpoo2.features)
+    print(rec_gpoo2.depth)
     # print(node.features for node in doo2.evaluated_nodes)
     # print(doo2.evaluated_fs)
             
-    print(len(sto1.evaluated_fs))
-    print(len(sto2.evaluated_fs))
+    print(len(gpoo1.evaluated_fs))
+    print(len(gpoo2.evaluated_fs))
 
 
     # plot(arms_range, f, doo1, 'doo1')
     # plot(arms_range, f, doo2, 'doo2')
-    plot_two(arms_range, f, sto1, sto2, 'GPStoOO center v.s. ave')
+    plot_two(arms_range, gpoo1.f, gpoo1, gpoo2, 'GPOO center v.s. ave')
 
     # sto2 = StoOO(arms_range, f, delta1, k, n, reward_type, eta)
 
@@ -159,6 +161,6 @@ if run_GPStoOO:
 
     # # plot(arms_range, f, doo1, 'doo1')
     # # plot(arms_range, f, doo2, 'doo2')
-    # plot_three(arms_range, f, sto1, sto2, sto3, 'GPStoOO v.s. StoOO v.s. GPTree (center)')
+    # plot_three(arms_range, f, sto1, sto2, sto3, 'GPOO v.s. StoOO v.s. GPTree (center)')
 
         

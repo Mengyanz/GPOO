@@ -296,18 +296,18 @@ class GPOO(StoOO):
         self.Y_list = []
         self.sample_count = 0 
 
-        self.lengthscale = 0.1 # 1 # 0.2
+        self.lengthscale = 0.1
         self.kernel_var = 0.5
-        self.gp_noise_var = 1e-10 # self.kernel_var * 0.05
-        self.lengthscale_bounds = [0.05, 1]
-        self.kernel_var_bounds = [0.05, 1]
+        self.gp_noise_var = self.kernel_var * 0.05 # 1e-10 
+        self.lengthscale_bounds = [0.05, 10]
+        self.kernel_var_bounds = [0.05, 10]
 
         # self.kernel = GPy.kern.RBF(input_dim=1, 
         #                         variance=self.kernel_var, 
         #                         lengthscale=self.lengthscale)
 
         self.f = self.gene_f() 
-        self.opt_flag = True
+        self.opt_flag = False
         
 
     def gene_f(self):
@@ -321,7 +321,8 @@ class GPOO(StoOO):
         # Y = np.sin(X) + np.random.randn(sample_size, 1)*0.05
 
         X = np.array([0.05, 0.2, 0.4, 0.65, 0.9]).reshape(sample_size,1)
-        Y = np.array([0.9, 0.1, 0.95, 0.05, 0.98]).reshape(sample_size,1)
+        # Y = np.array([0.9, 0.1, 0.95, 0.05, 0.98]).reshape(sample_size,1)
+        Y = np.array([0.85, 0.1, 0.87, 0.05, 0.98]).reshape(sample_size,1)
 
         kernel = GPy.kern.RBF(input_dim=1, 
                             variance=self.kernel_var, 
@@ -367,8 +368,8 @@ class GPOO(StoOO):
     def beta(self,t = 1):
         # TODO: need to change (based on theo analysis)
         # return 0.5 * np.log(t)
-        # return 100 * np.log(1000 * np.pi**2 * t**2/(6 * self.eta))
-        return 1
+        return 0.1 * np.log(np.pi**2 * t**2/(6 * 0.1))
+        # return 1
 
     def add_obs(self,x):
         """Sample reward of x and add observation x to X_list, A_list, Y_list 
@@ -433,7 +434,7 @@ class GPOO(StoOO):
             )
         plt.legend()
         # plt.ylim(-1,2)
-        plt.savefig('reg' + str(self.sample_count) + '.png')
+        plt.savefig('reg' + str(self.sample_count) +'_'+self.reward_type+ '_opt' + str(self.opt_flag) + '.png')
 
     def rec(self):
         self.expand(self.root)
@@ -489,19 +490,19 @@ class GPOO(StoOO):
             if self.opt_flag:
                 self.m.optimize()
 
-            print('*****************************')
-            print('kernel paras:')
-            print(self.m.kern.variance)
-            print(self.m.kern.lengthscale)
-            print(self.gp_noise_var)
-            print('*****************************')
-            
-            self.regression_eva()
+            # print('*****************************')
+            # print('kernel paras:')
+            # print(self.m.kern.variance)
+            # print(self.m.kern.lengthscale)
+            # print(self.gp_noise_var)
+            # print('*****************************')
+            if self.sample_count % 10 == 0:
+                self.regression_eva()
             self.update_bvalue()
             
-            print('sample ', self.sample_count)
-            print('delta ', self.delta(selected_node.depth))
-            print('threshold ', self.threshold(selected_node))
+            # print('sample ', self.sample_count)
+            # print('delta ', self.delta(selected_node.depth))
+            # print('threshold ', self.threshold(selected_node))
             # if self.sample_count >=10:
             #     raise Exception
 
@@ -620,39 +621,63 @@ def plot_tree(node, ax):
             ax.plot([node.center, child.center], [-node.depth, - child.depth], c = 'gray', alpha = 0.5)
             plot_tree(child, ax)
 
-
-def plot(arms_range, f, doo, axes):
+def plot(arms_range, f, oo, axes, name):
     # fig, axes = plt.subplots(2, 1, figsize = (6,8), sharex=True)
 
     # data = []
     # neg_depth = []
-    # for node in doo.evaluated_nodes:
+    # for node in oo.evaluated_nodes:
     #     data.append(node.features)
     #     neg_depth.append(- node.depth)
     # axes[0].scatter(data, neg_depth, s = 1)
 
-    plot_tree(doo.root, axes[0])
+    plot_tree(oo.root, axes[0])
     
     size = 1000
     x = np.linspace(arms_range[0], arms_range[1], size)
     x = np.asarray(x).reshape(size, 1)
-    axes[1].plot(x, f(x), c = 'r', alpha = 0.5)
+    axes[1].plot(x, f(x), c = 'r', alpha = 0.5, label = 'f')
     # plt.show()
     
+    # if name == 'center':
+    node_centers = []
+    for i, node in enumerate(oo.evaluated_nodes):
+        node_centers.append(node.center)
+    axes[1].scatter(node_centers, oo.evaluated_fs, label = 'samples', color = 'grey', s = 5)
+    # elif name == 'ave':
+    #     for i, node in enumerate(oo.evaluated_nodes):
+    #         axes[1].plot(node.cell, [oo.evaluated_fs[i], oo.evaluated_fs[i]], color = 'grey')
+        
+    mu, var = oo.m.predict(x, A_ast = None)
+    std = np.sqrt(var)
+    n = len(oo.evaluated_fs)
+    beta = oo.beta(n)
+    
+    axes[1].plot(x, mu, color = 'tab:blue', label = 'predictions')
+    axes[1].fill_between(
+        x.reshape(-1,), 
+        (mu + beta * std).reshape(-1,),
+        (mu - beta * std).reshape(-1,), 
+        alpha = 0.3
+        )
+    axes[1].legend()
+    axes[1].set_ylim(-0.5,1.5)
+    
 
-def plot_two(arms_range, f, doo1, doo2, name = 'center'):
+def plot_two(arms_range, f, oo1, oo2, name = 'center'):
     fig, axes = plt.subplots(2, 2, figsize = (12,8), sharex=True)
-    plot(arms_range, f, doo1, axes[:, 0])
-    plot(arms_range, f, doo2, axes[:, 1])
+    plot(arms_range, f, oo1, axes[:, 0], 'center')
+    plot(arms_range, f, oo2, axes[:, 1], 'ave')
     fig.suptitle(name)
-    plt.savefig(name + '_doo.png')
+    assert oo1.opt_flag == oo2.opt_flag
+    plt.savefig(name + '_opt' + str(oo1.opt_flag) + '.png', bbox_inches='tight')
 
-def plot_three(arms_range, f, doo1, doo2, doo3, name = 'center'):
-    fig, axes = plt.subplots(2, 3, figsize = (12,8), sharex=True)
-    plot(arms_range, f, doo1, axes[:, 0])
-    plot(arms_range, f, doo2, axes[:, 1])
-    plot(arms_range, f, doo3, axes[:, 2])
-    fig.suptitle(name)
-    plt.savefig(name + '_doo.png')
+# def plot_three(arms_range, f, oo1, oo2, oo3, name = 'center'):
+#     fig, axes = plt.subplots(2, 3, figsize = (12,8), sharex=True)
+#     plot(arms_range, f, oo1, axes[:, 0])
+#     plot(arms_range, f, oo2, axes[:, 1])
+#     plot(arms_range, f, oo3, axes[:, 2])
+#     fig.suptitle(name)
+#     plt.savefig(name + '_oo.png')
 
             
