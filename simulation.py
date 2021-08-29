@@ -1,9 +1,10 @@
 from typing import DefaultDict
 import numpy as np
 import matplotlib.pyplot as plt
-import GPy
 from numpy.lib.function_base import select
+import GPy
 from gpr_group_model import GPRegression_Group
+from functools import partial
 import pretty_errors
 
 np.random.seed(2021)
@@ -172,7 +173,6 @@ class Base():
             self.leaves.append(node)
         self.leaves.remove(x)
 
-
 class DOO(Base):
     """Implementation of Deterministic Optimistic Optimisation algorithm 
     http://www.nowpublishers.com/articles/foundations-and-trends-in-machine-learning/MAL-038
@@ -275,8 +275,7 @@ class StoOO(Base):
 
         return self.deepest_expanded_node
 
-
-class GPStoOO(StoOO):
+class GPOO(StoOO):
     """
     We extend StoOO to the case where f is sampled from GP. 
 
@@ -297,6 +296,66 @@ class GPStoOO(StoOO):
         self.Y_list = []
         self.sample_count = 0 
 
+        self.lengthscale = 0.1 # 1 # 0.2
+        self.kernel_var = 0.5
+        self.gp_noise_var = 1e-10 # self.kernel_var * 0.05
+        self.lengthscale_bounds = [0.05, 1]
+        self.kernel_var_bounds = [0.05, 1]
+
+        # self.kernel = GPy.kern.RBF(input_dim=1, 
+        #                         variance=self.kernel_var, 
+        #                         lengthscale=self.lengthscale)
+
+        self.f = self.gene_f() 
+        self.opt_flag = True
+        
+
+    def gene_f(self):
+        """Generate unknown f to be optimised by 
+        posterior of a the known GP
+        """
+        sample_size = 5
+        size = 1
+
+        # X = np.random.uniform(0, 1., (sample_size, 1))
+        # Y = np.sin(X) + np.random.randn(sample_size, 1)*0.05
+
+        X = np.array([0.05, 0.2, 0.4, 0.65, 0.9]).reshape(sample_size,1)
+        Y = np.array([0.9, 0.1, 0.95, 0.05, 0.98]).reshape(sample_size,1)
+
+        kernel = GPy.kern.RBF(input_dim=1, 
+                            variance=self.kernel_var, 
+                            lengthscale=self.lengthscale)
+        model = GPy.models.GPRegression(X,Y,kernel, noise_var=self.gp_noise_var)
+
+        # return partial(model.posterior_samples_f, size=size)
+        def wraps(*args):
+            return model.predict(*args)[0]
+        return wraps
+
+        # testX = np.linspace(0, 1, 100).reshape(-1, 1)
+        # posteriorTestY = model.posterior_samples_f(testX,size=size)
+    
+        # simY, simMse = model.predict(testX)
+        # for i in range(size):
+        #     plt.plot(testX, posteriorTestY[:,:,i])
+        # plt.plot(X, Y, 'ok', markersize=5)
+        # plt.plot(testX, simY - 3 * simMse ** 0.5, '--g')
+        # plt.plot(testX, simY + 3 * simMse ** 0.5, '--g')
+        # plt.legend()
+        # plt.savefig('posterior_f.png')
+
+    def reward(self, node):
+        rewards = []
+        
+        for feature in node.features:
+            feature = feature.reshape(1, self.d)
+            rewards.append(self.f(feature))
+
+        noise = np.random.normal(0, self.sigma)
+
+        return np.mean(rewards) + noise
+
     def sample(self,x):
         reward = self.reward(x)
         self.samples[x].append(reward)
@@ -305,11 +364,11 @@ class GPStoOO(StoOO):
 
         return reward
 
-    def beta(self,t):
+    def beta(self,t = 1):
         # TODO: need to change (based on theo analysis)
         # return 0.5 * np.log(t)
-        return 0.5 * np.log(np.pi**2 * t**2/(6 * self.eta))
-        # return 1 
+        # return 100 * np.log(1000 * np.pi**2 * t**2/(6 * self.eta))
+        return 1
 
     def add_obs(self,x):
         """Sample reward of x and add observation x to X_list, A_list, Y_list 
@@ -350,49 +409,118 @@ class GPStoOO(StoOO):
         for x in self.leaves:
             self.bvalues[x] = self.bvalue(x)
 
+    def regression_eva(self):
+        size = 100
+        x = np.linspace(self.root.cell[0], self.root.cell[1], size).reshape(-1,1)
+
+        f = self.f(x)
+        mu, var = self.m.predict(x, A_ast = None)
+        std = np.sqrt(var)
+
+        node_centers = []
+        for i, node in enumerate(self.evaluated_nodes):
+            node_centers.append(node.center)
+
+        plt.figure()
+        plt.scatter(node_centers, self.evaluated_fs, label = 'obs')
+        plt.plot(x, f, color = 'tab:orange', label = 'f')
+        plt.plot(x, mu, color = 'tab:blue', label = 'pred')
+        plt.fill_between(
+            x.reshape(-1,), 
+            (mu + self.beta() * std).reshape(-1,),
+            (mu - self.beta() * std).reshape(-1,), 
+            alpha = 0.3
+            )
+        plt.legend()
+        # plt.ylim(-1,2)
+        plt.savefig('reg' + str(self.sample_count) + '.png')
+
     def rec(self):
         self.expand(self.root)
         for x in self.leaves:
             A,X,Y = self.add_obs(x)
 
-        print(A)
-        print(X)
-        print(Y)
-
-        self.kernel = GPy.kern.RBF(input_dim=1, variance=0.1, lengthscale=1.)
-        self.m = GPRegression_Group(X, Y, self.kernel, A = A)
+        kernel = GPy.kern.RBF(input_dim=1, 
+                            variance=self.kernel_var, 
+                            lengthscale=self.lengthscale) 
+        self.m = GPRegression_Group(X, Y, kernel, A = A, noise_var=self.gp_noise_var)
         # self.m.optimize()
         self.update_bvalue()
+        selected_node = max(self.bvalues, key = self.bvalues.get)
 
         while self.sample_count < self.n: # change n to sample budget
             for x in self.leaves:
                 if x not in self.evaluated_nodes:
-                    # self.bvalues[x] = self.bvalue(x)
-                    self.bvalues[x] = np.inf
+                    self.bvalues[x] = self.bvalue(x)
+                    # self.bvalues[x] = np.inf
 
-            selected_node = max(self.bvalues, key = self.bvalues.get)
-            A,X,Y = self.add_obs(selected_node)
-            self.m.set_XY_group(X=X,Y=Y,A=A)
-            # self.m.optimize()
-            self.update_bvalue()
-            
-            # print('round ' +  str(i) + ' threshold ' + str(thereshold))
-            # if self.delta(selected_node.depth) >= self.threshold(selected_node):
-            if self.T_dict[selected_node] >= self.threshold(selected_node):
+            # print('# sample: ', self.sample_count)
+            # print('leaves:')
+            # for i in self.leaves:
+            #     print(i.center)
+            # print('bvalues:')
+            # for key, value in self.bvalues.items():
+            #     print(key.center)
+            #     print(value)
+
+            # print('selected node: ', selected_node.center)
+            # print('################################')
+
+            if self.delta(selected_node.depth) >= self.threshold(selected_node):
+            # if self.T_dict[selected_node] >= self.threshold(selected_node):
                 del self.bvalues[selected_node]
                 # FIXME: need to fix the case where there is more than one nodes in the deepest depth
                 if selected_node.depth > self.deepest_expanded_node.depth:
                     self.deepest_expanded_node = selected_node
                 self.expand(selected_node)
 
+            selected_node = max(self.bvalues, key = self.bvalues.get)
+
+            A,X,Y = self.add_obs(selected_node)
+
+            kernel = GPy.kern.RBF(input_dim=1, 
+                                variance=self.kernel_var, 
+                                lengthscale=self.lengthscale) 
+            kernel.lengthscale.constrain_bounded(self.lengthscale_bounds[0],self.lengthscale_bounds[1], warning=False)
+            kernel.variance.constrain_bounded(self.kernel_var_bounds[0], self.kernel_var_bounds[1], warning=False)
+
+            self.m = GPRegression_Group(X, Y, kernel, A = A, noise_var=self.gp_noise_var)
+            # self.m.set_XY_group(X=X,Y=Y,A=A)
+            if self.opt_flag:
+                self.m.optimize()
+
+            print('*****************************')
+            print('kernel paras:')
+            print(self.m.kern.variance)
+            print(self.m.kern.lengthscale)
+            print(self.gp_noise_var)
+            print('*****************************')
+            
+            self.regression_eva()
+            self.update_bvalue()
+            
+            print('sample ', self.sample_count)
+            print('delta ', self.delta(selected_node.depth))
+            print('threshold ', self.threshold(selected_node))
+            # if self.sample_count >=10:
+            #     raise Exception
+
+        import pickle 
+        data_dict = {}
+        data_dict['X'] = X
+        data_dict['Y'] = Y
+        data_dict['A'] = A
+        with open('save_data.pickle', 'wb') as handle:
+            pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
         return self.deepest_expanded_node
 
-class GPTree(GPStoOO):
+class GPTree(GPOO):
     # FIXME: rewrite.
     """
         Algorithm in Shekhar et al. 2018
     """
-    def __init__(self, arms_range, f, delta, k, n, reward_type = 'center', eta = 0.1, 
+    def __init__(self, f, delta, root_cell, n, k=2, d=1, s=1, reward_type = 'center', sigma = 0.1, eta=0.1,
                 alpha = 0.5, rho = 0.5, u = 2.0, v1 = 1.0, v2 = 1.0, C3 = 1.0, C2 = 1.0, D1=1) -> None:
         """
         alpha, rho (0,1)
@@ -401,6 +529,7 @@ class GPTree(GPStoOO):
         C2,C3 > 0 (corollary 1)
         D1 >= 0 metric dimension (Defi 2)
         """
+        super().__init__(f, delta, root_cell, n, k, d, s, reward_type, sigma, eta)
         # TODO: might need to change constant rate
         self.beta_n = 0.1 * np.sqrt(np.log(n) + u)
         self.betastd = {}
@@ -415,8 +544,6 @@ class GPTree(GPStoOO):
         self.C4 = C2 + 2 * np.log(n**2 * np.pi ** 2/6)
         self.D1 = D1
 
-        super().__init__(arms_range, f, delta, k, n, reward_type, eta)
-
     def g(self,x):
         """In assumption A2"""
         # TODO: smoothness assumption, might needs to change later
@@ -428,18 +555,7 @@ class GPTree(GPStoOO):
         temp = np.sqrt(2 * self.u + self.C4 + h * np.log(self.k) + 4 * self.D1 * np.log(1/self.g(self.v1 * self.rho ** h)))
         return 4 * self.g(self.v1 * self.rho ** h) * (temp + self.C3)
 
-    def bvalue(self, x, t = None, reward = None):
-        """
-            Return bvalue of tree node x
-        """
-        if reward == None:
-            reward = self.reward(x)
-        self.samples[x].append(reward)
-        self.evaluated_nodes.append(x)
-        self.evaluated_fs.append(reward)
-
-        self.update_posterior(x.features, reward)
-
+    def bvalue(self, x):
         mu, var = self.m.predict(np.array([x.features]).reshape(1,1))
         if x.depth > 0:
             x_parent = x.parent
@@ -451,7 +567,14 @@ class GPTree(GPStoOO):
         term2 = mu_p[0,0] + self.beta_n * np.sqrt(var_p[0,0]) + self.V(x.depth - 1)
         U = np.min([term1, term2])
 
-        return U + self.V(x.depth), self.beta_n * np.sqrt(var[0,0])
+        return U + self.V(x.depth), self.beta_n * np.sqrt(var[0,0]) 
+
+    def threshold(self, x):
+        if x not in self.evaluated_nodes:
+            return np.inf
+        else:
+            mu, var = self.m.predict(np.array([x.features]).reshape(1,1))
+            return self.beta_n * np.sqrt(var[0,0])    
 
     def rec(self):
         # self.bvalues[self.root] = self.bvalue(self.root)
@@ -467,10 +590,8 @@ class GPTree(GPStoOO):
 
             selected_node = max(self.bvalues, key = self.bvalues.get)
 
-            if selected_node not in self.betastd.keys():
-                self.betastd[selected_node] = np.inf
-
-            if self.betastd[selected_node] <= self.V(selected_node.depth) and selected_node.depth <= self.hmax:
+        
+            if self.threshold(selected_node) <= self.V(selected_node.depth) and selected_node.depth <= self.hmax:
                 del self.bvalues[selected_node]
                 if selected_node.depth > self.deepest_expanded_node.depth:
                     self.deepest_expanded_node = selected_node
@@ -480,7 +601,10 @@ class GPTree(GPStoOO):
                     self.T_dict[selected_node] += 1
                 else:
                     self.T_dict[selected_node] = 1
-                self.bvalues[selected_node], self.betastd[selected_node] = self.bvalue(selected_node)
+                self.add_obs(selected_node)
+                
+                self.update_bvalue()
+                self.bvalues[selected_node] = self.bvalue(selected_node)
                 ne+=1
 
             t += 1
@@ -509,7 +633,9 @@ def plot(arms_range, f, doo, axes):
 
     plot_tree(doo.root, axes[0])
     
-    x = np.linspace(arms_range[0], arms_range[1], 1000)
+    size = 1000
+    x = np.linspace(arms_range[0], arms_range[1], size)
+    x = np.asarray(x).reshape(size, 1)
     axes[1].plot(x, f(x), c = 'r', alpha = 0.5)
     # plt.show()
     

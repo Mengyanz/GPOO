@@ -9,8 +9,8 @@ log_2_pi = np.log(2*np.pi)
 class ExactGaussianInferenceGroup(ExactGaussianInference):
     def inference(self, kern, X, likelihood, Y, mean_function=None, Y_metadata=None, K=None, variance=None, Z_tilde=None, A = None):
         """
-        TODO: to be changed
         Returns a Posterior class containing essential quantities of the posterior
+        The comments below corresponds to Alg 2.1 in GPML textbook.
         """
         # print('ExactGaussianInferenceGroup inference:')
         if mean_function is None:
@@ -27,17 +27,29 @@ class ExactGaussianInferenceGroup(ExactGaussianInference):
         if K is None:
             if A is None:
                 A = np.identity(X.shape[0])
-            K = A.dot(kern.K(X)).dot(A.T)
+            K = A.dot(kern.K(X)).dot(A.T) # A_t k(X_t, X_t) A_t^T
+        else:
+            raise NotImplementedError('Need to be extended to group case!')
             
 
         Ky = K.copy()
-        diag.add(Ky, variance+1e-8)
+        diag.add(Ky, variance+1e-8) # A_t k(X_t, X_t)A_t^T + sigma^2 I
 
-        Wi, LW, LWi, W_logdet = pdinv(Ky)
+        # pdinv: 
+        # Wi: inverse of Ky
+        # LW: the Cholesky decomposition of Ky -> L
+        # LWi: the Cholesky decomposition of Kyi (not used)
+        # W_logdet: the log of the determinat of Ky
+        Wi, LW, LWi, W_logdet = pdinv(Ky) 
 
+        # LAPACK: DPOTRS solves a system of linear equations A*X = B with a symmetric
+        # positive definite matrix A using the Cholesky factorization
+        # A = U**T*U or A = L*L**T computed by DPOTRF.
         alpha, _ = dpotrs(LW, YYT_factor, lower=1)
+        # so this gives 
+        # (A_t k(X_t, X_t)A_t^T + sigma^2 I)^{-1} (Y_t - m)
 
-        # REVIEW: seems that log_marginal does not need to be changed
+        # Note: 20210827 confirm the log marginal likelihood 
         log_marginal =  0.5*(-Y.size * log_2_pi - Y.shape[1] * W_logdet - np.sum(alpha * YYT_factor))
 
         if Z_tilde is not None:
