@@ -42,8 +42,6 @@ class PosteriorExactGroup(PosteriorExact):
             Kxx = np.diag(A_ast.dot(kern.K(Xnew, Xnew)).dot(A_ast.T))
             if self._woodbury_chol.ndim == 2:
                 tmp = dtrtrs(self._woodbury_chol, Kx)[0]
-                # tmp = tmp.dot(A_ast.T)
-                # tmp = tmp.dot(A_ast)
                 var = (Kxx - np.square(tmp).sum(0))[:, None]
             elif self._woodbury_chol.ndim == 3:  # Missing data
                 raise NotImplementedError('Need to be extended to group case!')
