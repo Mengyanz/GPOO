@@ -9,13 +9,28 @@ from simulation import *
 import pretty_errors
 
 # np.random.seed(2021)
+n = 80
+n_repeat = 200
 
 # import pickle
-# with open('save_regret.pickle', 'rb') as handle:
+# regret_dict = {}
+# with open('gpoo_save_regret_80_200.pickle', 'rb') as handle:
 #     data_dict = pickle.load(handle)
-# regret_gpoo1 = data_dict['center']
-# regret_gpoo2 = data_dict['ave']
-# plot_regret_two(regret_gpoo1, regret_gpoo2, 'GPOO center v.s. ave', n_repeat=len(regret_gpoo1))
+#     regret_dict['GPOO Center'] = data_dict['center']
+#     regret_dict['GPOO Ave'] = data_dict['ave']
+
+# with open('gptree_save_regret.pickle', 'rb') as handle:
+#     data_dict = pickle.load(handle)
+#     regret_dict['GPTree Center'] = data_dict['center']
+#     regret_dict['GPTree Ave'] = data_dict['ave']
+
+# with open('random_save_regret.pickle', 'rb') as handle:
+#     data_dict = pickle.load(handle)
+#     regret_dict['Random Center'] = data_dict['center']
+#     regret_dict['Random Ave'] = data_dict['ave']
+
+# # fig, axes = plt.subplots(1, 1, figsize = (4,8))
+# plot_regret_two(regret_dict, regret_dict, 'Regret comparison', budget = n, n_repeat=n_repeat)
 
 # raise Exception
 
@@ -24,10 +39,11 @@ import pretty_errors
 
 run_DOO = False
 run_StoOO = False
-run_GPOO = True
+run_GPOO = False
+run_GPTree = False
+run_random = True
 
-n = 80
-n_repreat = 200
+
 k = 2
 arms_range = [0.0, 1.0]
 reward_type = 'center'
@@ -139,7 +155,7 @@ if run_GPOO:
     rep_regret_list1 = []
     rep_regret_list2 = []
 
-    for i in range(n_repreat):
+    for i in range(n_repeat):
         print(i)
 
         gpoo1 = GPOO(
@@ -173,46 +189,117 @@ if run_GPOO:
         pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
+if run_GPTree:
+    rep_regret_list1 = []
+    rep_regret_list2 = []
 
-        # print('ave:')
-        # print('regret: ', regret_gpoo2)
-        # print(gpoo2.rec_node.features)
-        # print(gpoo2.rec_node.depth)
+    for i in range(n_repeat):
+        print(i)
 
-        # print(node.features for node in doo2.evaluated_nodes)
-        # print(doo2.evaluated_fs)
-                
-        # print(len(gpoo1.evaluated_fs))
-        # print(len(gpoo2.evaluated_fs))
+        gptree1 = GPTree(
+            f=f, delta=delta1, root_cell=arms_range, n=n, k=k, d=1, s=1, reward_type = 'center', sigma = 0.1, eta=0.1
+            )
+        regret_gptree1 = gptree1.rec()
+        rep_regret_list1.append(regret_gptree1)
+
+        # print('center:')
+        # print('regret: ', regret_gptree1)
+        # print(gptree1.rec_node.features)
+        # print(gptree1.rec_node.depth)
+        # print('*****************************')
+
+        # print([node.features for node in doo1.evaluated_nodes])
+        # print(doo1.evaluated_fs)
+        # print()
+
+        gptree2 = GPTree(
+            f=f, delta=delta1, root_cell=arms_range, n=n, k=k, d=1, s=10, reward_type = 'ave', sigma = 0.1, eta=0.1
+        )
+        regret_gptree2 = gptree2.rec()
+        rep_regret_list2.append(regret_gptree2)
+
+    plot_two(arms_range, gptree1.f, gptree1, gptree2, 'GPTree center v.s. ave')
+
+    import pickle 
+    data_dict = {}
+    data_dict['center'] = rep_regret_list1
+    data_dict['ave'] = rep_regret_list2
+    
+    with open('gptree_save_regret.pickle', 'wb') as handle:
+        pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+if run_random:
+    
+    rep_regret_list1 = []
+    rep_regret_list2 = []
+    for i in range(n_repeat):
+        regret_list1 = []
+        regret_list2 = []
+        for b in np.linspace(1, n, n):
+            b = int(b)
+            ran1 = Random(
+                f=f, delta=delta1, root_cell=arms_range, n=b, k=b, d=1, s=1, reward_type = 'center', sigma = 0.1, eta=0.1
+            )
+            ran2 = Random(
+                f=f, delta=delta1, root_cell=arms_range, n=b, k=b, d=1, s=10, reward_type = 'ave', sigma = 0.1, eta=0.1
+            )
+            regret_list1.append(ran1.rec())
+            regret_list2.append(ran2.rec())
+        rep_regret_list1.append(regret_list1)
+        rep_regret_list2.append(regret_list2)
+
+    # plot_two(arms_range, ran1.f, ran1, ran2, 'Random center v.s. ave')
+
+    import pickle 
+    data_dict = {}
+    data_dict['center'] = rep_regret_list1
+    data_dict['ave'] = rep_regret_list2
+    
+    with open('random_save_regret.pickle', 'wb') as handle:
+        pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    
 
 
-        # plot(arms_range, f, doo1, 'doo1')
-        # plot(arms_range, f, doo2, 'doo2')
-        # plot_regret_two(regret_gpoo1, regret_gpoo2, 'GPOO center v.s. ave')
-        # plot_two(arms_range, gpoo1.f, gpoo1, gpoo2, 'GPOO center v.s. ave')
 
+# print('ave:')
+# print('regret: ', regret_gpoo2)
+# print(gpoo2.rec_node.features)
+# print(gpoo2.rec_node.depth)
 
-
-
-    # sto2 = StoOO(arms_range, f, delta1, k, n, reward_type, eta)
-
-    # rec_sto2 = sto2.rec()
-    # print(rec_sto2.features)
-    # print(rec_sto2.depth)
-
-    # sto3 = GPTree(arms_range, f, delta1, k, n, reward_type, eta)
-
-    # rec_sto3 = sto3.rec()
-    # print(rec_sto3.features)
-    # print(rec_sto3.depth)
-            
-    # print(len(sto1.evaluated_fs))
-    # print(len(sto2.evaluated_fs))
-    # print(len(sto3.evaluated_fs))
-
-
-    # # plot(arms_range, f, doo1, 'doo1')
-    # # plot(arms_range, f, doo2, 'doo2')
-    # plot_three(arms_range, f, sto1, sto2, sto3, 'GPOO v.s. StoOO v.s. GPTree (center)')
-
+# print(node.features for node in doo2.evaluated_nodes)
+# print(doo2.evaluated_fs)
         
+# print(len(gpoo1.evaluated_fs))
+# print(len(gpoo2.evaluated_fs))
+
+
+# plot(arms_range, f, doo1, 'doo1')
+# plot(arms_range, f, doo2, 'doo2')
+# plot_regret_two(regret_gpoo1, regret_gpoo2, 'GPOO center v.s. ave')
+# plot_two(arms_range, gpoo1.f, gpoo1, gpoo2, 'GPOO center v.s. ave')
+
+
+
+
+# sto2 = StoOO(arms_range, f, delta1, k, n, reward_type, eta)
+
+# rec_sto2 = sto2.rec()
+# print(rec_sto2.features)
+# print(rec_sto2.depth)
+
+# sto3 = GPTree(arms_range, f, delta1, k, n, reward_type, eta)
+
+# rec_sto3 = sto3.rec()
+# print(rec_sto3.features)
+# print(rec_sto3.depth)
+        
+# print(len(sto1.evaluated_fs))
+# print(len(sto2.evaluated_fs))
+# print(len(sto3.evaluated_fs))
+
+
+# # plot(arms_range, f, doo1, 'doo1')
+# # plot(arms_range, f, doo2, 'doo2')
+# plot_three(arms_range, f, sto1, sto2, sto3, 'GPOO v.s. StoOO v.s. GPTree (center)')
+
+    

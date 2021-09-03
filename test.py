@@ -4,6 +4,9 @@ import pretty_errors
 import matplotlib.pyplot as plt
 # GPy.plotting.change_plotting_library('plotly')
 
+x = np.linspace(0, 1, 1000)
+print(x)
+raise Exception
 
 def beta(t = 1):
     # return 0.5 * np.log(t)

@@ -424,6 +424,7 @@ class GPOO(StoOO):
         self.A_list.append(A_x)
         self.X_list.append(x.features)
         reward = self.sample(x)
+        print('x:', x)
         if x in self.T_dict.keys():
             self.T_dict[x] += 1
         else:
@@ -567,8 +568,18 @@ class GPOO(StoOO):
 
         return self.regret_list
 
+class Random(GPOO):
+    def rec(self):
+        self.k = self.n
+        print(self.k)
+        self.expand(self.root)
+        reward = []
+        for node in self.leaves:
+            self.sample(node)
+        self.rec_node = self.evaluated_nodes[np.argmax(self.evaluated_fs)]
+        return self.regret()
+
 class GPTree(GPOO):
-    # FIXME: rewrite.
     """
         Algorithm in Shekhar et al. 2018
     """
@@ -599,7 +610,7 @@ class GPTree(GPOO):
     def g(self,x):
         """In assumption A2"""
         # TODO: smoothness assumption, might needs to change later
-        return x
+        return 0.1 * x
 
     def V(self, h):
         """In claim 2"""
@@ -607,61 +618,75 @@ class GPTree(GPOO):
         temp = np.sqrt(2 * self.u + self.C4 + h * np.log(self.k) + 4 * self.D1 * np.log(1/self.g(self.v1 * self.rho ** h)))
         return 4 * self.g(self.v1 * self.rho ** h) * (temp + self.C3)
 
+    def threshold(self,x):
+        mu, var = self.m.predict(x.features, self.A)
+        return self.beta_n * np.sqrt(var) 
+
     def bvalue(self, x):
-        mu, var = self.m.predict(np.array([x.features]).reshape(1,1))
+        mu, var = self.m.predict(x.features, self.A)
+        term1 = mu + self.beta_n * np.sqrt(var)
         if x.depth > 0:
-            x_parent = x.parent
+            mu_p, var_p = self.m.predict(x.parent.features, self.A)
+            term2 = mu_p + self.beta_n * np.sqrt(var_p) + self.V(x.depth - 1)
+            U = np.min([term1, term2])
         else:
-            x_parent = x
-        mu_p, var_p = self.m.predict(np.array([x_parent.features]).reshape(1,1))
-
-        term1 = mu[0,0] + self.beta_n * np.sqrt(var[0,0])
-        term2 = mu_p[0,0] + self.beta_n * np.sqrt(var_p[0,0]) + self.V(x.depth - 1)
-        U = np.min([term1, term2])
-
-        return U + self.V(x.depth), self.beta_n * np.sqrt(var[0,0]) 
-
-    def threshold(self, x):
-        if x not in self.evaluated_nodes:
-            return np.inf
-        else:
-            mu, var = self.m.predict(np.array([x.features]).reshape(1,1))
-            return self.beta_n * np.sqrt(var[0,0])    
+            U = term1
+        return U + self.V(x.depth)    
 
     def rec(self):
         # self.bvalues[self.root] = self.bvalue(self.root)
-
-        ne = 0
-        t = 1
-
-        while ne <= self.n:
-            for x in self.leaves:
-                if x not in self.evaluated_nodes:
-                    # self.bvalues[x] = self.bvalue(x)
-                    self.bvalues[x] = np.inf
-
-            selected_node = max(self.bvalues, key = self.bvalues.get)
-
         
-            if self.threshold(selected_node) <= self.V(selected_node.depth) and selected_node.depth <= self.hmax:
-                del self.bvalues[selected_node]
-                if selected_node.depth > self.rec_node.depth:
-                    self.rec_node = selected_node
-                self.expand(selected_node)
-            else:
-                if selected_node in self.T_dict.keys():
-                    self.T_dict[selected_node] += 1
-                else:
-                    self.T_dict[selected_node] = 1
-                self.add_obs(selected_node)
+
+        while self.sample_count < self.n:
+            print(self.sample_count)
+            if self.sample_count == 0:
                 
+                A,X,Y = self.add_obs(self.root)
+
+                kernel = GPy.kern.RBF(input_dim=1, 
+                                    variance=self.kernel_var, 
+                                    lengthscale=self.lengthscale) 
+                self.m = GPRegression_Group(X, Y, kernel, A = A, noise_var=self.gp_noise_var)
+                # self.m.optimize()
                 self.update_bvalue()
-                self.bvalues[selected_node] = self.bvalue(selected_node)
-                ne+=1
+                regret = self.regret()
+                self.regret_list.append(regret)
+            else:
+                for x in self.leaves:
+                    if x not in self.evaluated_nodes:
+                        self.bvalues[x] = self.bvalue(x)
+                        # self.bvalues[x] = np.inf
 
-            t += 1
+                selected_node = max(self.bvalues, key = self.bvalues.get)
+                print('selected node: ', selected_node)
+        
+                if self.threshold(selected_node) <= self.V(selected_node.depth) and selected_node.depth <= self.hmax:
+                    print('threshold: ', self.threshold(selected_node))
+                    print('self.v: ', self.V(selected_node.depth))
+                    del self.bvalues[selected_node]
+                    if selected_node.depth > self.rec_node.depth:
+                        self.rec_node = selected_node
+                    self.expand(selected_node)
+                else:
+                    print('before add obs')
+                    A,X,Y = self.add_obs(selected_node)
+                    print('finish add obs')
+                    kernel = GPy.kern.RBF(input_dim=1, 
+                                    variance=self.kernel_var, 
+                                    lengthscale=self.lengthscale) 
+                    kernel.lengthscale.constrain_bounded(self.lengthscale_bounds[0],self.lengthscale_bounds[1], warning=False)
+                    kernel.variance.constrain_bounded(self.kernel_var_bounds[0], self.kernel_var_bounds[1], warning=False)
 
-        return self.rec_node
+                    self.m = GPRegression_Group(X, Y, kernel, A = A, noise_var=self.gp_noise_var)
+                    # self.m.set_XY_group(X=X,Y=Y,A=A)
+                    if self.opt_flag:
+                        self.m.optimize()
+                    
+                    self.update_bvalue()
+                    regret = self.regret()
+                    self.regret_list.append(regret)
+
+        return self.regret_list
 # ------------------------------------------------------------------------------
 # Plot func 
 
@@ -731,23 +756,28 @@ def plot_two(arms_range, f, oo1, oo2, name = 'center'):
 #     fig.suptitle(name)
 #     plt.savefig(name + '_oo.png')
 
-def plot_regret(regret_list, ax, n_repeat):
-    regret_array = np.asarray(regret_list).reshape(n_repeat,-1)
-    regret_mean = np.mean(regret_array, axis=0)
-    regret_std = np.std(regret_array, axis=0)
-    ax.plot(range(1,len(regret_mean)+1), regret_mean)
-    ax.fill_between(
-        range(1,len(regret_mean)+1), 
-        regret_mean + regret_std,
-        regret_mean - regret_std,
-        alpha = 0.3)
+def plot_regret(regret_dict, ax, n_repeat):
+    for key, regret_list in regret_dict.items():
+        regret_array = np.asarray(regret_list).reshape(n_repeat,-1)
+        regret_mean = np.mean(regret_array, axis=0)
+        regret_std = np.std(regret_array, axis=0)
+        ax.plot(range(1,len(regret_mean)+1), regret_mean, label = str(key))
+        ax.fill_between(
+            range(1,len(regret_mean)+1), 
+            regret_mean + regret_std,
+            regret_mean - regret_std,
+            alpha = 0.1)
+    ax.set_ylabel('regret')
+    ax.set_xlabel('round')
+    ax.set_ylim(-0.05, 0.8)
+    ax.legend()
 
-def plot_regret_two(regret_list1, regret_list2, name = 'GPOO center v.s. ave', n_repeat = 1):
+def plot_regret_two(regret_dict1, regret_dict2, name = 'Compare center v.s. ave', budget = 50, n_repeat = 1):
     fig, axes = plt.subplots(1, 2, figsize = (12,8), sharex=True)
-    plot_regret(regret_list1, axes[0], n_repeat)
-    plot_regret(regret_list2, axes[1], n_repeat)
+    plot_regret(regret_dict1, axes[0], n_repeat)
+    plot_regret(regret_dict2, axes[1], n_repeat)
     fig.suptitle(name)
-    budget = len(regret_list1[0])
+    # budget = len(regret_list1[0])
     plt.savefig(name + '_' + str(budget) + '_' + str(n_repeat) + '_regret.png', bbox_inches='tight')
 
 
