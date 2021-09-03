@@ -180,6 +180,8 @@ if run_GPOO:
         regret_gpoo2 = gpoo2.rec()
         rep_regret_list2.append(regret_gpoo2)
 
+    plot_two(arms_range, gpoo1.f, gpoo1, gpoo2, 'GPOO center v.s. ave')
+
     import pickle 
     data_dict = {}
     data_dict['center'] = rep_regret_list1
