@@ -6,10 +6,13 @@ from numpy.lib.function_base import select
 from gpr_group_model import GPRegression_Group
 from simulation import * 
 import pickle
+import os
 import pretty_errors
 
 #-----------------------------------------------------------------------------------
 # parameters
+
+save_folder = 'GPOO_results2/'
 
 # np.random.seed(2021)
 n = 80 # budget
@@ -28,10 +31,10 @@ opt_flag = False # whether optimise parameters in gpr
 
 run_DOO = False
 run_StoOO = True
-run_GPOO = False
-run_GPTree = False
-run_random = False
-plot_regret = False
+run_GPOO = True
+run_GPTree = True
+run_random = True
+plot_regret = True
 plot_tree = True
 
 # ----------------------------------------------------------------------------------
@@ -39,25 +42,23 @@ plot_tree = True
 
 if plot_regret:
     regret_dict = {}
-    with open('gpoo_save_regret_80_200.pickle', 'rb') as handle:
-        data_dict = pickle.load(handle)
-        regret_dict['GPOO Center'] = data_dict['center']
-        regret_dict['GPOO Ave'] = data_dict['ave']
 
-    with open('gptree_save_regret.pickle', 'rb') as handle:
-        data_dict = pickle.load(handle)
-        regret_dict['GPTree Center'] = data_dict['center']
-        regret_dict['GPTree Ave'] = data_dict['ave']
+    for alg in ['GPOO', 'StoOO', 'Random', 'GPTreee']:
+        saved_file = alg + '_regret_' + str(n) + '_' + str(n_repeat) + '.pickle'
 
-    with open('random_save_regret.pickle', 'rb') as handle:
-        data_dict = pickle.load(handle)
-        regret_dict['Random Center'] = data_dict['center']
-        regret_dict['Random Ave'] = data_dict['ave']
+        if os.path.isfile(saved_file):
+            with open(saved_file, 'rb') as handle:
+                data_dict = pickle.load(handle)
+                regret_dict[alg + ' Center'] = data_dict['center']
+                regret_dict[alg + ' Ave'] = data_dict['ave']
+        else:
+            print('Warning: ', str(saved_file) + ' not exist. Please check.')
 
     # fig, axes = plt.subplots(1, 1, figsize = (4,8))
-    plot_regret_two(regret_dict, regret_dict, 'Regret GPTree', budget = n, n_repeat=n_repeat)
+    plot_name = 'Regret_' + str(n) + '_' + str(n_repeat)
+    plot_regret_one(regret_dict, plot_name, budget = n, n_repeat=n_repeat, save_folder=save_folder)
 
-    raise Exception
+    # raise Exception
 
 # -------------------------------------------------------------------------------
 # function and delta
@@ -69,18 +70,20 @@ def f(x):
     """Generate unknown f to be optimised by 
     posterior of a the known GP
     """
-    sample_size = 5
     size = 1
 
     # X = np.random.uniform(0, 1., (sample_size, 1))
     # Y = np.sin(X) + np.random.randn(sample_size, 1)*0.05
 
     # option 1:
-    X = np.array([0.05, 0.2, 0.4, 0.65, 0.9]).reshape(sample_size,1)
-    # Y = np.array([0.9, 0.1, 0.95, 0.05, 0.98]).reshape(sample_size,1)
-    Y = np.array([0.85, 0.1, 0.87, 0.05, 0.98]).reshape(sample_size,1)
+    # sample_size = 5
+    # X = np.array([0.05, 0.2, 0.4, 0.65, 0.9]).reshape(sample_size,1)
+    # Y = np.array([0.85, 0.1, 0.87, 0.05, 0.98]).reshape(sample_size,1)
 
     # option 2:
+    sample_size = 9
+    X = np.array([0.05, 0.2, 0.3, 0.4, 0.5, 0.65, 0.75, 0.9, 0.95]).reshape(sample_size,1)
+    Y = np.array([0.1, 0.3, 0.15, 0.35, 0.12, 0.85, 0.05, 0.98, 0.3]).reshape(sample_size,1)
 
     kernel = GPy.kern.RBF(input_dim=d, 
                         variance=kernel_var, 
@@ -103,15 +106,16 @@ def get_opt_x(f, arms_range):
     # REVIEW: we assume there is an unique opt point
     return x[np.argmax(f_list)].reshape(-1,1)
 
-# # test f
-# testX = np.linspace(arms_range[0], arms_range[1], 100).reshape(-1, 1)
-# posteriorTestY = f(testX)
-# opt_x = get_opt_x(f, arms_range)
+# test f
+testX = np.linspace(arms_range[0], arms_range[1], 100).reshape(-1, 1)
+posteriorTestY = f(testX)
+opt_x = get_opt_x(f, arms_range)
 
-# for i in range(100):
-#     plt.plot(testX, posteriorTestY)
-# plt.scatter(opt_x, f(opt_x), c = 'red')
-# plt.savefig('posterior_f.png')
+fig, axes = plt.subplots(1, 1, figsize = (6,8))
+for i in range(100):
+    axes.plot(testX, posteriorTestY)
+axes.scatter(opt_x, f(opt_x), c = 'red')
+plt.savefig(save_folder + 'posterior_f.png')
 
 # def opt_x(f, arms_range, f_type):
 #     size = 1000
@@ -217,13 +221,13 @@ if run_StoOO:
         print('**************************************')
 
         if plot_tree:
-            plot_two(arms_range, f, sto1, sto2, 'StoOO center v.s. ave')
+            plot_two(arms_range, f, sto1, sto2, 'StoOO', save_folder=save_folder)
 
     data_dict = {}
     data_dict['center'] = rep_regret_list1
     data_dict['ave'] = rep_regret_list2
     
-    save_name = 'stooo _save_regret_' + str(n) + '_' + str(n_repeat) + '.pickle'
+    save_name = save_folder + 'StoOO_regret_' + str(n) + '_' + str(n_repeat) + '.pickle'
     with open(save_name, 'wb') as handle:
         pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
         
@@ -259,13 +263,13 @@ if run_GPOO:
         rep_regret_list2.append(regret_gpoo2)
 
     if plot_tree:
-        plot_two(arms_range, gpoo1.f, gpoo1, gpoo2, 'GPOO center v.s. ave')
+        plot_two(arms_range, gpoo1.f, gpoo1, gpoo2, 'GPOO',save_folder=save_folder)
 
     data_dict = {}
     data_dict['center'] = rep_regret_list1
     data_dict['ave'] = rep_regret_list2
     
-    save_name = 'gpoo_save_regret_' + str(n) + '_' + str(n_repeat) + '.pickle'
+    save_name = save_folder + 'GPOO_regret_' + str(n) + '_' + str(n_repeat) + '.pickle'
     with open(save_name, 'wb') as handle:
         pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -277,7 +281,7 @@ if run_GPTree:
         print(i)
 
         gptree1 = GPTree(
-            f=f, delta=delta1, root_cell=arms_range, n=n, k=k, d=1, s=1, reward_type = 'center', sigma = 0.1, 
+            f=f, delta=delta1, root_cell=arms_range, n=n, k=k, d=1, s=1, reward_type = 'center', sigma = 0.1, opt_x = opt_x,
             lengthscale = lengthscale, kernel_var = kernel_var, gp_noise_var = gp_noise_var, opt_flag = opt_flag
             )
         regret_gptree1 = gptree1.rec()
@@ -294,20 +298,22 @@ if run_GPTree:
         # print()
 
         gptree2 = GPTree(
-            f=f, delta=delta1, root_cell=arms_range, n=n, k=k, d=1, s=10, reward_type = 'ave', sigma = 0.1,
+            f=f, delta=delta1, root_cell=arms_range, n=n, k=k, d=1, s=10, reward_type = 'ave', sigma = 0.1, opt_x = opt_x,
             lengthscale = lengthscale, kernel_var = kernel_var, gp_noise_var = gp_noise_var, opt_flag = opt_flag
         )
         regret_gptree2 = gptree2.rec()
         rep_regret_list2.append(regret_gptree2)
 
-    plot_two(arms_range, gptree1.f, gptree1, gptree2, 'GPTree center v.s. ave')
+    if plot_tree:
+        plot_two(arms_range, gptree1.f, gptree1, gptree2, 'GPTree', save_folder=save_folder)
 
     import pickle 
     data_dict = {}
     data_dict['center'] = rep_regret_list1
     data_dict['ave'] = rep_regret_list2
     
-    with open('gptree_save_regret.pickle', 'wb') as handle:
+    save_name = save_folder+ 'GPTree_regret_' + str(n) + '_' + str(n_repeat) + '.pickle'
+    with open(save_name, 'wb') as handle:
         pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 if run_random:
@@ -320,24 +326,26 @@ if run_random:
         for b in np.linspace(1, n, n):
             b = int(b)
             ran1 = Random(
-                f=f, delta=delta1, root_cell=arms_range, n=b, k=b, d=1, s=1, reward_type = 'center', sigma = 0.1, 
+                f=f, delta=delta1, root_cell=arms_range, n=b, k=b, d=1, s=1, reward_type = 'center', sigma = 0.1, opt_x = opt_x
             )
             ran2 = Random(
-                f=f, delta=delta1, root_cell=arms_range, n=b, k=b, d=1, s=10, reward_type = 'ave', sigma = 0.1, 
+                f=f, delta=delta1, root_cell=arms_range, n=b, k=b, d=1, s=10, reward_type = 'ave', sigma = 0.1, opt_x = opt_x
             )
             regret_list1.append(ran1.rec())
             regret_list2.append(ran2.rec())
         rep_regret_list1.append(regret_list1)
         rep_regret_list2.append(regret_list2)
 
-    # plot_two(arms_range, ran1.f, ran1, ran2, 'Random center v.s. ave')
+    if plot_tree:
+        plot_two(arms_range, ran1.f, ran1, ran2, 'Random', save_folder=save_folder)
 
     import pickle 
     data_dict = {}
     data_dict['center'] = rep_regret_list1
     data_dict['ave'] = rep_regret_list2
     
-    with open('random_save_regret.pickle', 'wb') as handle:
+    save_name = save_folder + 'Random_regret_' + str(n) + '_' + str(n_repeat) + '.pickle'
+    with open(save_name, 'wb') as handle:
         pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
     
 

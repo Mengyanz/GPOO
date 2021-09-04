@@ -654,6 +654,12 @@ class GPTree(GPOO):
 # ------------------------------------------------------------------------------
 # Plot func 
 
+def valid_plot_title(name):
+    return name.replace('_', ' ')
+
+def valid_plot_filename(name):
+    return name.replace(' ', '_')
+
 def plot_tree(node, ax):
     ax.scatter(node.center, -node.depth, s=1.5, c = 'b')
     if len(node.children) > 0:
@@ -671,6 +677,7 @@ def plot(arms_range, f, oo, axes, name):
     #     neg_depth.append(- node.depth)
     # axes[0].scatter(data, neg_depth, s = 1)
 
+    axes[0].set_title(name)
     plot_tree(oo.root, axes[0])
     
     size = 1000
@@ -688,7 +695,7 @@ def plot(arms_range, f, oo, axes, name):
     #     for i, node in enumerate(oo.evaluated_nodes):
     #         axes[1].plot(node.cell, [oo.evaluated_fs[i], oo.evaluated_fs[i]], color = 'grey')
         
-    if 'gp' in name or 'GP' in name:
+    if hasattr(oo, 'm'):
         mu, var = oo.m.predict(x, A_ast = None)
         std = np.sqrt(var)
         n = len(oo.evaluated_fs)
@@ -705,16 +712,17 @@ def plot(arms_range, f, oo, axes, name):
     axes[1].set_ylim(-0.5,1.5)
     
 
-def plot_two(arms_range, f, oo1, oo2, name = 'center'):
+def plot_two(arms_range, f, oo1, oo2, name, save_folder = ''):
     fig, axes = plt.subplots(2, 2, figsize = (12,8), sharex=True)
     plot(arms_range, f, oo1, axes[:, 0], 'center')
     plot(arms_range, f, oo2, axes[:, 1], 'ave')
-    fig.suptitle(name)
-    if 'gp' in name or 'GP' in name:
+    fig.suptitle(valid_plot_title(name))
+
+    if hasattr(oo1, 'm'):
         assert oo1.opt_flag == oo2.opt_flag
-        plt.savefig(name + '_opt' + str(oo1.opt_flag) + '.png', bbox_inches='tight')
+        plt.savefig(save_folder + valid_plot_filename(name) + '_opt' + str(oo1.opt_flag) + '.png', bbox_inches='tight')
     else:
-        plt.savefig(name + '.png', bbox_inches='tight')
+        plt.savefig(save_folder + valid_plot_filename(name) + '.png', bbox_inches='tight')
 
 # def plot_three(arms_range, f, oo1, oo2, oo3, name = 'center'):
 #     fig, axes = plt.subplots(2, 3, figsize = (12,8), sharex=True)
@@ -740,13 +748,20 @@ def plot_regret(regret_dict, ax, n_repeat):
     ax.set_ylim(-0.05, 0.8)
     ax.legend()
 
-def plot_regret_two(regret_dict1, regret_dict2, name = 'Compare center v.s. ave', budget = 50, n_repeat = 1):
-    fig, axes = plt.subplots(1, 2, figsize = (12,8), sharex=True)
-    plot_regret(regret_dict1, axes[0], n_repeat)
-    plot_regret(regret_dict2, axes[1], n_repeat)
-    fig.suptitle(name)
+def plot_regret_one(regret_dict, name = 'Regret', budget = 50, n_repeat = 1, save_folder = ''):
+    fig, axes = plt.subplots(1, 1, figsize = (6,8))
+    plot_regret(regret_dict, axes, n_repeat)
+    fig.suptitle(valid_plot_title(name))
     # budget = len(regret_list1[0])
-    plt.savefig(name + '_' + str(budget) + '_' + str(n_repeat) + '_regret.png', bbox_inches='tight')
+    plt.savefig(save_folder + valid_plot_filename(name) + '.png', bbox_inches='tight')
+
+# def plot_regret_two(regret_dict1, regret_dict2, name = 'Regret', budget = 50, n_repeat = 1):
+#     fig, axes = plt.subplots(1, 2, figsize = (12,8), sharex=True)
+#     plot_regret(regret_dict1, axes[0], n_repeat)
+#     plot_regret(regret_dict2, axes[1], n_repeat)
+#     fig.suptitle(valid_plot_title(name))
+#     # budget = len(regret_list1[0])
+#     plt.savefig(valid_plot_filename(name) + '.png', bbox_inches='tight')
 
 
             
