@@ -74,8 +74,6 @@ class Base():
         choices: 'center', 'ave'
     sigma: float
         noise standard deviation 
-    eta: float
-        error probability, [0,1]
 
     root: Tree instance
         root node
@@ -88,14 +86,25 @@ class Base():
     bvalues: dict
         key: Tree instance; value: latest bvalue of the key node
     regret_list: list of regret for each time step
+
+    T_dict: dict
+        key: Tree instance 
+        value: number of times the key node have been drawn
+    samples: dict 
+        key: Tree instance
+        value: list of rewards observed at the key node
+    rec_node: Tree instance
+        indicator of the deepest expanded node, 
+        the center of which will be recommended after the budget is run out.
     """
-    def __init__(self, f, delta, root_cell, n, k=2, d=1, s=1, reward_type = 'center', sigma=0.0, eta=0.0, opt_x = None) -> None:
+    def __init__(self, f, delta, root_cell, n, k=2, d=1, s=1, reward_type = 'center', sigma=0.0, opt_x = None) -> None:
         
         self.f = f # the function to be optimised, take arm feature as argument
-        if opt_x is None:
-            self.opt_x = self.get_opt_x()
-        else:
-            self.opt_x = opt_x 
+        # if opt_x is None:
+        #     self.opt_x = self.get_opt_x()
+        # else:
+        self.opt_x = opt_x 
+        # print('opt x: ', self.opt_x)
         self.delta = delta # upper bound of diameters, a func of h
         
         self.n = n # sample budget
@@ -104,7 +113,6 @@ class Base():
         self.s = s
         self.reward_type = reward_type
         self.sigma = sigma
-        self.eta = eta 
 
         assert reward_type in {'center', 'ave'}
         if reward_type == 'center':
@@ -126,17 +134,33 @@ class Base():
         self.bvalues = {}
         self.regret_list = []
 
-    def opt_x(self):
+        self.T_dict = {} # key: node, value: number of times have been drawn
+        self.samples = DefaultDict(list) # key: node, value: list of samples
+        self.rec_node = self.root
+
+
+    # def opt_x(self):
+    #     size = 1000
+        
+    #     x = np.linspace(self.root.cell[0], self.root.cell[1], size)
+        
+    #     f_list = []
+    #     for i in x:
+    #         f_list.append(f(x))
+
+    #     # REVIEW: we assume there is an unique opt point
+    #     return np.argmax(f_list)
+
+    def get_opt_x(self):
+        """Empirical opt x.
+        """
         size = 1000
         
-        x = np.linspace(self.root.cell[0], self.root.cell[1], size)
+        x = np.linspace(self.root.cell[0], self.root.cell[1], size).reshape(-1,1)
+        f_list = self.f(x)
         
-        f_list = []
-        for i in x:
-            f_list.append(f(x))
-
         # REVIEW: we assume there is an unique opt point
-        return np.argmax(f_list)
+        return x[np.argmax(f_list)].reshape(-1,1)
 
 
     def gene_feature(self, cell):
@@ -167,19 +191,34 @@ class Base():
         """
         return (interval[0] + interval[1])/2.0
 
+    # def noiseles_reward(self,node):
+    #     rewards = []
+        
+    #     for feature in node.features:
+    #         rewards.append(self.f(feature))
+    #     # REVIEW: need to change if use weighted sum
+    #     return np.mean(rewards)
+
     def noiseles_reward(self,node):
         rewards = []
         
         for feature in node.features:
+            feature = feature.reshape(1, self.d)
             rewards.append(self.f(feature))
-        # REVIEW: need to change if use weighted sum
         return np.mean(rewards)
-
+    
     def reward(self, node):
         # REVIEW: to decide for non-gp case, whether to use bounded noise
         noise = np.random.normal(0, self.sigma)
-
         return self.noiseles_reward(node) + noise
+
+    def sample(self,x):
+        reward = self.reward(x)
+        self.samples[x].append(reward)
+        self.evaluated_nodes.append(x)
+        self.evaluated_fs.append(reward)
+
+        return reward
 
     def expand(self, x):
         """
@@ -200,8 +239,19 @@ class Base():
 
     def regret(self):
         # print('opt x: ', self.opt_x)
-        # print('f at opt x: ', self.opt_x)
+        # print('f at opt x: ', self.f(self.opt_x))
         return self.f(self.opt_x)[0,0] - self.noiseles_reward(self.rec_node)
+
+class Random(Base):
+    def rec(self):
+        self.k = self.n
+        print(self.k)
+        self.expand(self.root)
+        reward = []
+        for node in self.leaves:
+            self.sample(node)
+        self.rec_node = self.evaluated_nodes[np.argmax(self.evaluated_fs)]
+        return self.regret()
 
 class DOO(Base):
     """Implementation of Deterministic Optimistic Optimisation algorithm 
@@ -243,31 +293,18 @@ class StoOO(Base):
 
     Parameters
     ----------------------------------------------------------
-    T_dict: dict
-        key: Tree instance 
-        value: number of times the key node have been drawn
-    samples: dict 
-        key: Tree instance
-        value: list of rewards observed at the key node
-    rec_node: Tree instance
-        indicator of the deepest expanded node, 
-        the center of which will be recommended after the budget is run out.
+    eta: float
+        error probability, [0,1]
     """
-    def __init__(self, f, delta, root_cell, n, k=2, d=1, s=1, reward_type = 'center', sigma = 0.1, eta=0.1, opt_x = None) -> None:
-        super().__init__(f, delta, root_cell, n, k, d, s, reward_type, sigma, eta, opt_x)
-
-        self.T_dict = {} # key: node, value: number of times have been drawn
-        self.samples = DefaultDict(list) # key: node, value: list of samples
-        self.rec_node = self.root
+    def __init__(self, f, delta, root_cell, n, k=2, d=1, s=1, reward_type = 'center', sigma = 0.1, opt_x = None, eta=0.1) -> None:
+        super().__init__(f, delta, root_cell, n, k, d, s, reward_type, sigma, opt_x)   
+        self.eta = eta  
 
     def bvalue(self, x):
         """
             Return bvalue of tree node x
         """
-        reward = self.reward(x)
-        self.samples[x].append(reward)
-        self.evaluated_nodes.append(x)
-        self.evaluated_fs.append(reward)
+        reward = self.sample(x)
 
         if len(self.samples[x]) >= 1:
             confidence_width = np.log(self.n**2/self.eta)/(2.0 * len(self.samples[x]))
@@ -291,6 +328,7 @@ class StoOO(Base):
                 self.T_dict[selected_node] += 1
             else:
                 self.T_dict[selected_node] = 1
+            # only needs to update the bvalue of selected node
             self.bvalues[selected_node] = self.bvalue(selected_node)
             sample_count +=1
             
@@ -303,9 +341,9 @@ class StoOO(Base):
                     self.rec_node = selected_node
                 self.expand(selected_node)
 
-        return self.rec_node
+        return self.regret()
 
-class GPOO(StoOO):
+class GPOO(Base):
     """
     We extend StoOO to the case where f is sampled from GP. 
 
@@ -315,20 +353,17 @@ class GPOO(StoOO):
     # TODO: extend to support other kernels.
 
     """
-    def __init__(self, f, delta, root_cell, n, k=2, d=1, s=1, reward_type = 'center', sigma = 0.1, eta=0.1) -> None:
-        super().__init__(f, delta, root_cell, n, k, d, s, reward_type, sigma, eta, 0)
-
-        # self.X = np.zeros((self.n * self.s, self.d))
-        # self.A =  np.zeros((self.n, self.n * self.s))
+    def __init__(self, f, delta, root_cell, n, k=2, d=1, s=1, reward_type = 'center', sigma = 0.1, opt_x = None, **kwarg) -> None:
+        super().__init__(f, delta, root_cell, n, k, d, s, reward_type, sigma, opt_x)
 
         self.X_list = []
         self.A_list = []
         self.Y_list = []
         self.sample_count = 0 
 
-        self.lengthscale = 0.1
-        self.kernel_var = 0.5
-        self.gp_noise_var = self.kernel_var * 0.05 # 1e-10 
+        # self.lengthscale = 0.1
+        # self.kernel_var = 0.5
+        # self.gp_noise_var = self.kernel_var * 0.05 # 1e-10 
         self.lengthscale_bounds = [0.05, 10]
         self.kernel_var_bounds = [0.05, 10]
 
@@ -336,78 +371,18 @@ class GPOO(StoOO):
         #                         variance=self.kernel_var, 
         #                         lengthscale=self.lengthscale)
 
-        self.f = self.gene_f() 
-        self.opt_x = self.get_opt_x()
-        self.opt_flag = False
-
-    def get_opt_x(self):
-        """Empirical opt x.
-        """
-        size = 1000
-        
-        x = np.linspace(self.root.cell[0], self.root.cell[1], size).reshape(-1,1)
-        f_list = self.f(x)
-        
-        # REVIEW: we assume there is an unique opt point
-        return x[np.argmax(f_list)].reshape(-1,1)
-        
-
-    def gene_f(self):
-        """Generate unknown f to be optimised by 
-        posterior of a the known GP
-        """
-        sample_size = 5
-        size = 1
-
-        # X = np.random.uniform(0, 1., (sample_size, 1))
-        # Y = np.sin(X) + np.random.randn(sample_size, 1)*0.05
-
-        X = np.array([0.05, 0.2, 0.4, 0.65, 0.9]).reshape(sample_size,1)
-        # Y = np.array([0.9, 0.1, 0.95, 0.05, 0.98]).reshape(sample_size,1)
-        Y = np.array([0.85, 0.1, 0.87, 0.05, 0.98]).reshape(sample_size,1)
-
-        kernel = GPy.kern.RBF(input_dim=1, 
-                            variance=self.kernel_var, 
-                            lengthscale=self.lengthscale)
-        model = GPy.models.GPRegression(X,Y,kernel, noise_var=self.gp_noise_var)
-
-        # return partial(model.posterior_samples_f, size=size)
-        def wraps(*args):
-            return model.predict(*args)[0]
-        return wraps
-
-        # testX = np.linspace(0, 1, 100).reshape(-1, 1)
-        # posteriorTestY = model.posterior_samples_f(testX,size=size)
-    
-        # simY, simMse = model.predict(testX)
-        # for i in range(size):
-        #     plt.plot(testX, posteriorTestY[:,:,i])
-        # plt.plot(X, Y, 'ok', markersize=5)
-        # plt.plot(testX, simY - 3 * simMse ** 0.5, '--g')
-        # plt.plot(testX, simY + 3 * simMse ** 0.5, '--g')
-        # plt.legend()
-        # plt.savefig('posterior_f.png')
-
-    def noiseles_reward(self,node):
-        rewards = []
-        
-        for feature in node.features:
-            feature = feature.reshape(1, self.d)
-            rewards.append(self.f(feature))
-        return np.mean(rewards)
-    
-    def reward(self, node):
-        
-        noise = np.random.normal(0, self.sigma)
-        return self.noiseles_reward(node) + noise
-
-    def sample(self,x):
-        reward = self.reward(x)
-        self.samples[x].append(reward)
-        self.evaluated_nodes.append(x)
-        self.evaluated_fs.append(reward)
-
-        return reward
+        # self.f = self.gene_f() 
+        # self.opt_x = self.get_opt_x()
+            
+        if kwarg.__len__() == 4:
+            # for gp case, we need to input 4 paras in the following
+            self.lengthscale = kwarg['lengthscale']
+            self.kernel_var = kwarg['kernel_var']
+            self.gp_noise_var = kwarg['gp_noise_var']
+            self.opt_flag = kwarg['opt_flag']
+        else: 
+            print(kwarg.__len__())
+            raise Exception
 
     def beta(self,t = 1):
         # TODO: need to change (based on theo analysis)
@@ -424,7 +399,7 @@ class GPOO(StoOO):
         self.A_list.append(A_x)
         self.X_list.append(x.features)
         reward = self.sample(x)
-        print('x:', x)
+        print('x:', x.center)
         if x in self.T_dict.keys():
             self.T_dict[x] += 1
         else:
@@ -494,10 +469,10 @@ class GPOO(StoOO):
         selected_node = max(self.bvalues, key = self.bvalues.get)
 
         while self.sample_count < self.n: # change n to sample budget
-            for x in self.leaves:
-                if x not in self.evaluated_nodes:
-                    self.bvalues[x] = self.bvalue(x)
-                    # self.bvalues[x] = np.inf
+            # for x in self.leaves:
+            #     if x not in self.evaluated_nodes:
+            #         self.bvalues[x] = self.bvalue(x)
+            #         # self.bvalues[x] = np.inf
 
             # print('# sample: ', self.sample_count)
             # print('leaves:')
@@ -568,23 +543,12 @@ class GPOO(StoOO):
 
         return self.regret_list
 
-class Random(GPOO):
-    def rec(self):
-        self.k = self.n
-        print(self.k)
-        self.expand(self.root)
-        reward = []
-        for node in self.leaves:
-            self.sample(node)
-        self.rec_node = self.evaluated_nodes[np.argmax(self.evaluated_fs)]
-        return self.regret()
-
 class GPTree(GPOO):
     """
         Algorithm in Shekhar et al. 2018
     """
-    def __init__(self, f, delta, root_cell, n, k=2, d=1, s=1, reward_type = 'center', sigma = 0.1, eta=0.1,
-                alpha = 0.5, rho = 0.5, u = 2.0, v1 = 1.0, v2 = 1.0, C3 = 1.0, C2 = 1.0, D1=1) -> None:
+    def __init__(self, f, delta, root_cell, n, k=2, d=1, s=1, reward_type = 'center', sigma = 0.1, opt_x= None,
+                alpha = 0.5, rho = 0.5, u = 2.0, v1 = 1.0, v2 = 1.0, C3 = 1.0, C2 = 1.0, D1=1, **kwarg) -> None:
         """
         alpha, rho (0,1)
         u >0
@@ -592,9 +556,9 @@ class GPTree(GPOO):
         C2,C3 > 0 (corollary 1)
         D1 >= 0 metric dimension (Defi 2)
         """
-        super().__init__(f, delta, root_cell, n, k, d, s, reward_type, sigma, eta)
+        super().__init__(f, delta, root_cell, n, k, d, s, reward_type, sigma,  opt_x, **kwarg)
         # TODO: might need to change constant rate
-        self.beta_n = 0.1 * np.sqrt(np.log(n) + u)
+        self.beta_n = 0.25 * np.sqrt(np.log(n) + u)
         self.betastd = {}
 
         # Todo: the following parameters might need to be chosen more carefully
@@ -658,19 +622,19 @@ class GPTree(GPOO):
                         # self.bvalues[x] = np.inf
 
                 selected_node = max(self.bvalues, key = self.bvalues.get)
-                print('selected node: ', selected_node)
+                # print('selected node: ', selected_node)
         
                 if self.threshold(selected_node) <= self.V(selected_node.depth) and selected_node.depth <= self.hmax:
-                    print('threshold: ', self.threshold(selected_node))
-                    print('self.v: ', self.V(selected_node.depth))
+                    # print('threshold: ', self.threshold(selected_node))
+                    # print('self.v: ', self.V(selected_node.depth))
                     del self.bvalues[selected_node]
                     if selected_node.depth > self.rec_node.depth:
                         self.rec_node = selected_node
                     self.expand(selected_node)
                 else:
-                    print('before add obs')
+                    # print('before add obs')
                     A,X,Y = self.add_obs(selected_node)
-                    print('finish add obs')
+                    # print('finish add obs')
                     kernel = GPy.kern.RBF(input_dim=1, 
                                     variance=self.kernel_var, 
                                     lengthscale=self.lengthscale) 
@@ -724,18 +688,19 @@ def plot(arms_range, f, oo, axes, name):
     #     for i, node in enumerate(oo.evaluated_nodes):
     #         axes[1].plot(node.cell, [oo.evaluated_fs[i], oo.evaluated_fs[i]], color = 'grey')
         
-    mu, var = oo.m.predict(x, A_ast = None)
-    std = np.sqrt(var)
-    n = len(oo.evaluated_fs)
-    beta = oo.beta(n)
-    
-    axes[1].plot(x, mu, color = 'tab:blue', label = 'predictions')
-    axes[1].fill_between(
-        x.reshape(-1,), 
-        (mu + beta * std).reshape(-1,),
-        (mu - beta * std).reshape(-1,), 
-        alpha = 0.3
-        )
+    if 'gp' in name or 'GP' in name:
+        mu, var = oo.m.predict(x, A_ast = None)
+        std = np.sqrt(var)
+        n = len(oo.evaluated_fs)
+        beta = oo.beta(n)
+        
+        axes[1].plot(x, mu, color = 'tab:blue', label = 'predictions')
+        axes[1].fill_between(
+            x.reshape(-1,), 
+            (mu + beta * std).reshape(-1,),
+            (mu - beta * std).reshape(-1,), 
+            alpha = 0.3
+            )
     axes[1].legend()
     axes[1].set_ylim(-0.5,1.5)
     
@@ -745,8 +710,11 @@ def plot_two(arms_range, f, oo1, oo2, name = 'center'):
     plot(arms_range, f, oo1, axes[:, 0], 'center')
     plot(arms_range, f, oo2, axes[:, 1], 'ave')
     fig.suptitle(name)
-    assert oo1.opt_flag == oo2.opt_flag
-    plt.savefig(name + '_opt' + str(oo1.opt_flag) + '.png', bbox_inches='tight')
+    if 'gp' in name or 'GP' in name:
+        assert oo1.opt_flag == oo2.opt_flag
+        plt.savefig(name + '_opt' + str(oo1.opt_flag) + '.png', bbox_inches='tight')
+    else:
+        plt.savefig(name + '.png', bbox_inches='tight')
 
 # def plot_three(arms_range, f, oo1, oo2, oo3, name = 'center'):
 #     fig, axes = plt.subplots(2, 3, figsize = (12,8), sharex=True)
