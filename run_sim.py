@@ -7,16 +7,40 @@ from gpr_group_model import GPRegression_Group
 from simulation import * 
 import pickle
 import os
+import argparse
+import sys
 import pretty_errors
 
 #-----------------------------------------------------------------------------------
 # parameters
 
-save_folder = 'GPOO_results3/'
+parser = argparse.ArgumentParser(description='Run Simulation for GPOO project.')
+parser.add_argument('opt_num', type = int, help = 'choose what f to use, choices: 1,2,3')
+parser.add_argument('--n', type = int, help = 'budget (should be positive integer)')
+parser.add_argument('--r', type = int, help = 'number of repeat (should be positive integer)')
+parser.add_argument('--alg', nargs='*', help = 'please list all algorithms to run. Choices: StoOO, GPOO, GPTree, Random')
+# args = parser.parse_args()
+args,_ = parser.parse_known_args()
+
+opt_num = str(args.opt_num) 
+save_folder = 'GPOO_results' + opt_num + '/'
 
 # np.random.seed(2021)
-n = 80 # budget
-n_repeat = 100 # number of repeat
+if args.n is not None:
+    n = args.n  
+else:
+    n = 80 # budget
+if args.r is not None:
+    n_repeat = args.r
+else:
+    n_repeat = 100 # number of repeat
+if args.alg is not None:
+    run_alg = args.alg
+    print(run_alg)
+else:
+    run_alg = ['StoOO', 'GPOO', 'GPTree', 'Random']
+
+
 arms_range = [0.0, 1.0] # root cell
 reward_type = 'center' # 'center' or 'ave'
 sigma = 0.1 # noise for observation (normal std)
@@ -28,20 +52,8 @@ lengthscale = 0.05 # kernel para
 kernel_var = 0.1 # kernel para
 gp_noise_var = kernel_var * 0.05 # 1e-10 # gp para
 opt_flag = False # whether optimise parameters in gpr
-
-run_DOO = False
-run_StoOO = True
-run_GPOO = True
-run_GPTree = True
-run_random = True
-plot_regret = True
+plot_regret = False
 plot_tree = True
-# run_StoOO = False
-# run_GPOO = False
-# run_GPTree = False
-# run_random = False
-# plot_regret = True
-# plot_tree = True
 
 # ----------------------------------------------------------------------------------
 # plot regret from saved file
@@ -49,7 +61,8 @@ plot_tree = True
 if plot_regret:
     regret_dict = {}
 
-    for alg in ['GPOO', 'StoOO', 'Random', 'GPTreee']:
+    for alg in ['GPOO', 'StoOO', 'Random', 'GPTree']:
+    # for alg in ['GPOO']:
         saved_file = save_folder + alg + '_regret_' + str(n) + '_' + str(n_repeat) + '.pickle'
 
         if os.path.isfile(saved_file):
@@ -82,36 +95,39 @@ def f(x):
     # Y = np.sin(X) + np.random.randn(sample_size, 1)*0.05
 
     # option 1:
-    # sample_size = 5
-    # X = np.array([0.05, 0.2, 0.4, 0.65, 0.9]).reshape(sample_size,1)
-    # Y = np.array([0.85, 0.1, 0.87, 0.05, 0.98]).reshape(sample_size,1)
+    if opt_num == '1':
+        sample_size = 5
+        X = np.array([0.05, 0.2, 0.4, 0.65, 0.9]).reshape(sample_size,1)
+        Y = np.array([0.85, 0.1, 0.87, 0.05, 0.98]).reshape(sample_size,1)
 
     # option 2:
-    # sample_size = 9
-    # X = np.array([0.05, 0.2, 0.3, 0.4, 0.5, 0.65, 0.75, 0.9, 0.95]).reshape(sample_size,1)
-    # Y = np.array([0.1, 0.3, 0.15, 0.35, 0.12, 0.85, 0.05, 0.98, 0.3]).reshape(sample_size,1)
+    if opt_num == '2':
+        sample_size = 9
+        X = np.array([0.05, 0.2, 0.3, 0.4, 0.5, 0.65, 0.75, 0.9, 0.95]).reshape(sample_size,1)
+        Y = np.array([0.1, 0.3, 0.15, 0.35, 0.12, 0.85, 0.05, 0.98, 0.3]).reshape(sample_size,1)
 
     # option 3:
-    np.random.seed(2021)
-    sample_size = 9
-    X = []
-    Y = []
-    split_list = np.linspace(arms_range[0], arms_range[1], num = 9)
-    for i in range(len(split_list)-1):
-        center = (split_list[i] + split_list[i+1])/2.0
-        y = np.random.uniform(0.0, 0.2)
-        X.append(center)
-        Y.append(y) # each center is assigned to a value 0~0.2
+    if opt_num == '3':
+        np.random.seed(2021)
+        sample_size = 9
+        X = []
+        Y = []
+        split_list = np.linspace(arms_range[0], arms_range[1], num = 9)
+        for i in range(len(split_list)-1):
+            center = (split_list[i] + split_list[i+1])/2.0
+            y = np.random.uniform(0.0, 0.2)
+            X.append(center)
+            Y.append(y) # each center is assigned to a value 0~0.2
 
-        another = np.random.uniform(split_list[i], split_list[i+1])
-        X.append(another)
-        Y.append(np.random.uniform(0.4, 0.6))
+            another = np.random.uniform(split_list[i], split_list[i+1])
+            X.append(another)
+            Y.append(np.random.uniform(0.4, 0.6))
 
-    X.append(0.9)
-    Y.append(0.9)
-    X = np.array(X).reshape(-1, 1)
-    Y = np.array(Y).reshape(-1,1)
-    # plt.scatter(X,Y)
+        X.append(0.9)
+        Y.append(0.9)
+        X = np.array(X).reshape(-1, 1)
+        Y = np.array(Y).reshape(-1,1)
+        plt.scatter(X,Y)
 
     kernel = GPy.kern.RBF(input_dim=d, 
                         variance=kernel_var, 
@@ -174,7 +190,7 @@ opt_x = get_opt_x(f, arms_range)
 print('opt_x: ', opt_x)
 print('opt f: ', f(opt_x))
 
-if run_DOO:
+if 'DOO' in run_alg:
     # FIXME: not updated
 
     doo1 = DOO(f=f, delta = delta1, root_cell = arms_range, n = n, k=k, reward_type=reward_type)
@@ -225,7 +241,7 @@ if run_DOO:
     # plot(arms_range, f, doo2, 'doo2')
     plot_two(arms_range, f, doo1, doo2, 'center v.s. ave')
 
-if run_StoOO:
+if 'StoOO' in run_alg:
     eta = 0.1
     rep_regret_list1 = []
     rep_regret_list2 = []
@@ -248,8 +264,11 @@ if run_StoOO:
             regret_list2.append(regret_sto2)
         print('**************************************')
 
-        if plot_tree:
-            plot_two(arms_range, f, sto1, sto2, 'StoOO', save_folder=save_folder)
+        rep_regret_list1.append(regret_list1)
+        rep_regret_list2.append(regret_list2)
+
+    if plot_tree:
+        plot_two(arms_range, f, sto1, sto2, 'StoOO', save_folder=save_folder)
 
     data_dict = {}
     data_dict['center'] = rep_regret_list1
@@ -260,7 +279,7 @@ if run_StoOO:
         pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
         
 
-if run_GPOO:
+if 'GPOO' in run_alg:
     rep_regret_list1 = []
     rep_regret_list2 = []
 
@@ -301,7 +320,7 @@ if run_GPOO:
     with open(save_name, 'wb') as handle:
         pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-if run_GPTree:
+if 'GPTree' in run_alg:
     rep_regret_list1 = []
     rep_regret_list2 = []
 
@@ -344,7 +363,7 @@ if run_GPTree:
     with open(save_name, 'wb') as handle:
         pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-if run_random:
+if 'Random' in run_alg:
     
     rep_regret_list1 = []
     rep_regret_list2 = []
