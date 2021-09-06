@@ -353,13 +353,14 @@ class GPOO(Base):
     # TODO: extend to support other kernels.
 
     """
-    def __init__(self, f, delta, root_cell, n, k=2, d=1, s=1, reward_type = 'center', sigma = 0.1, opt_x = None, **kwarg) -> None:
+    def __init__(self, f, delta, root_cell, n, k=2, d=1, s=1, reward_type = 'center', sigma = 0.1, opt_x = None, hmax = 4, **kwarg) -> None:
         super().__init__(f, delta, root_cell, n, k, d, s, reward_type, sigma, opt_x)
 
         self.X_list = []
         self.A_list = []
         self.Y_list = []
         self.sample_count = 0 
+        self.hmax = hmax 
 
         # self.lengthscale = 0.1
         # self.kernel_var = 0.5
@@ -399,7 +400,7 @@ class GPOO(Base):
         self.A_list.append(A_x)
         self.X_list.append(x.features)
         reward = self.sample(x)
-        print('x:', x.center)
+        # print('x:', x.center)
         if x in self.T_dict.keys():
             self.T_dict[x] += 1
         else:
@@ -486,7 +487,7 @@ class GPOO(Base):
             # print('selected node: ', selected_node.center)
             # print('################################')
 
-            if self.delta(selected_node.depth) >= self.threshold(selected_node):
+            if self.delta(selected_node.depth) >= self.threshold(selected_node) and selected_node.depth <= self.hmax:
             # if self.T_dict[selected_node] >= self.threshold(selected_node):
                 del self.bvalues[selected_node]
                 # FIXME: need to fix the case where there is more than one nodes in the deepest depth
@@ -547,7 +548,7 @@ class GPTree(GPOO):
     """
         Algorithm in Shekhar et al. 2018
     """
-    def __init__(self, f, delta, root_cell, n, k=2, d=1, s=1, reward_type = 'center', sigma = 0.1, opt_x= None,
+    def __init__(self, f, delta, root_cell, n, k=2, d=1, s=1, reward_type = 'center', sigma = 0.1, opt_x= None, 
                 alpha = 0.5, rho = 0.5, u = 2.0, v1 = 1.0, v2 = 1.0, C3 = 1.0, C2 = 1.0, D1=1, **kwarg) -> None:
         """
         alpha, rho (0,1)
@@ -556,13 +557,14 @@ class GPTree(GPOO):
         C2,C3 > 0 (corollary 1)
         D1 >= 0 metric dimension (Defi 2)
         """
-        super().__init__(f, delta, root_cell, n, k, d, s, reward_type, sigma,  opt_x, **kwarg)
+        hmax = np.log(n) * (1 + 1/alpha) / (2 * alpha * np.log(1/rho)) # e.q. 3.4
+        super().__init__(f, delta, root_cell, n, k, d, s, reward_type, sigma,  opt_x, hmax, **kwarg)
         # TODO: might need to change constant rate
         self.beta_n = 0.25 * np.sqrt(np.log(n) + u)
         self.betastd = {}
 
         # Todo: the following parameters might need to be chosen more carefully
-        self.hmax = np.log(n) * (1 + 1/alpha) / (2 * alpha * np.log(1/rho)) # e.q. 3.4
+        
         self.rho = rho
         self.u = u # claim 1 holds for probability at least 1 - e^{-u}
         self.v1 = v1
@@ -745,11 +747,11 @@ def plot_regret(regret_dict, ax, n_repeat):
             alpha = 0.1)
     ax.set_ylabel('regret')
     ax.set_xlabel('round')
-    ax.set_ylim(-0.05, 0.8)
+    ax.set_ylim(-0.05, 1)
     ax.legend()
 
 def plot_regret_one(regret_dict, name = 'Regret', budget = 50, n_repeat = 1, save_folder = ''):
-    fig, axes = plt.subplots(1, 1, figsize = (6,8))
+    fig, axes = plt.subplots(1, 1, figsize = (6,6))
     plot_regret(regret_dict, axes, n_repeat)
     fig.suptitle(valid_plot_title(name))
     # budget = len(regret_list1[0])

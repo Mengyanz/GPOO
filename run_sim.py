@@ -40,7 +40,7 @@ if args.alg is not None:
 else:
     run_alg = ['StoOO', 'GPOO', 'GPTree', 'Random']
 
-
+hmax = 10
 arms_range = [0.0, 1.0] # root cell
 reward_type = 'center' # 'center' or 'ave'
 sigma = 0.1 # noise for observation (normal std)
@@ -52,7 +52,7 @@ lengthscale = 0.05 # kernel para
 kernel_var = 0.1 # kernel para
 gp_noise_var = kernel_var * 0.05 # 1e-10 # gp para
 opt_flag = False # whether optimise parameters in gpr
-plot_regret = False
+plot_regret = True
 plot_tree = True
 
 # ----------------------------------------------------------------------------------
@@ -85,7 +85,7 @@ if plot_regret:
 # def f(x):
 #     return (np.sin(13.0 * x) * np.sin(27.0*x) + 1)/2.0
 
-def f(x):
+def construct_model_f(opt_num):
     """Generate unknown f to be optimised by 
     posterior of a the known GP
     """
@@ -129,15 +129,51 @@ def f(x):
         Y = np.array(Y).reshape(-1,1)
         plt.scatter(X,Y)
 
+    # option 4
+    if opt_num == '4':
+        # cheng: create a function that has different frequency on the left and right? I.e. wiggly on the left, very low wiggle on the right. E.g. only one wave for the high amplitude, but 10 waves for the low amplitude.
+        r = np.random.RandomState(2021)
+        sample_size = 9
+        X = []
+        Y = []
+        split_list = np.linspace(arms_range[0], 0.9, num = 10)
+        for i in range(len(split_list)-1):
+            center = (split_list[i] + split_list[i+1])/2.0
+            # y = r.uniform(0.05, 0.1)
+            y = 0.1
+            X.append(center)
+            Y.append(y) # each center is assigned to a value 0~0.2
+
+            # another = r.uniform(split_list[i], split_list[i+1])
+            another = center + 2.0 * (split_list[i+1] - split_list[i])/3
+            X.append(another)
+            # Y.append(r.uniform(0.2, 0.25))
+            Y.append(0.2)
+
+        X.append(0.95)
+        Y.append(0.9)
+        X = np.array(X).reshape(-1, 1)
+        Y = np.array(Y).reshape(-1,1)
+        plt.scatter(X,Y)
+
+    # option 5
+    if opt_num == '5':
+        # Russell: construct tree with level hmax = 4, and put each node's representative point (center) to be low values. And run GPOO with the same hmax
+        # grid splitting the arm range, and pick relatively low values for center and relatively high values for others points
+        pass
+
     kernel = GPy.kern.RBF(input_dim=d, 
                         variance=kernel_var, 
                         lengthscale=lengthscale)
     model = GPy.models.GPRegression(X,Y,kernel, noise_var=gp_noise_var)
 
-    # return partial(model.posterior_samples_f, size=size)
-    def wraps(*args):
-        return model.predict(*args)[0]
-    return wraps(x)
+    return model
+
+f_model = construct_model_f(opt_num)
+
+# return partial(model.posterior_samples_f, size=size)
+def f(x):
+    return f_model.predict(x)[0]
 
 def get_opt_x(f, arms_range):
     """Empirical opt x.
@@ -251,7 +287,7 @@ if 'StoOO' in run_alg:
         regret_list2 = []
         print('repeat: ', i)
         for b in range(n):
-            print('budget: ', b)
+            # print('budget: ', b)
             sto1 = StoOO(f=f, delta=delta1, root_cell=arms_range, n=b, k=k, d=d, s=1, reward_type = 'center', sigma = 0.1, opt_x = opt_x, eta = eta)
 
             regret_sto1 = sto1.rec()
@@ -262,7 +298,7 @@ if 'StoOO' in run_alg:
 
             regret_sto2 = sto2.rec()
             regret_list2.append(regret_sto2)
-        print('**************************************')
+        # print('**************************************')
 
         rep_regret_list1.append(regret_list1)
         rep_regret_list2.append(regret_list2)
@@ -284,9 +320,9 @@ if 'GPOO' in run_alg:
     rep_regret_list2 = []
 
     for i in range(n_repeat):
-
+        print('repeat: ', i)
         gpoo1 = GPOO(
-            f=f, delta=delta1, root_cell=arms_range, n=n, k=k, d=1, s=1, reward_type = 'center', sigma = 0.1, opt_x = opt_x,
+            f=f, delta=delta1, root_cell=arms_range, n=n, k=k, d=1, s=1, reward_type = 'center', sigma = 0.1, opt_x = opt_x, hmax = hmax,
             lengthscale = lengthscale, kernel_var = kernel_var, gp_noise_var = gp_noise_var, opt_flag = opt_flag
             )
         regret_gpoo1 = gpoo1.rec()
@@ -303,7 +339,7 @@ if 'GPOO' in run_alg:
         # print()
 
         gpoo2 = GPOO(
-            f=f, delta=delta1, root_cell=arms_range, n=n, k=k, d=1, s=10, reward_type = 'ave', sigma = 0.1, opt_x = get_opt_x(f, arms_range),
+            f=f, delta=delta1, root_cell=arms_range, n=n, k=k, d=1, s=10, reward_type = 'ave', sigma = 0.1, opt_x = get_opt_x(f, arms_range), hmax = hmax,
             lengthscale = lengthscale, kernel_var = kernel_var, gp_noise_var = gp_noise_var, opt_flag = opt_flag
         )
         regret_gpoo2 = gpoo2.rec()
@@ -325,7 +361,7 @@ if 'GPTree' in run_alg:
     rep_regret_list2 = []
 
     for i in range(n_repeat):
-        print(i)
+        print('repeat: ', i)
 
         gptree1 = GPTree(
             f=f, delta=delta1, root_cell=arms_range, n=n, k=k, d=1, s=1, reward_type = 'center', sigma = 0.1, opt_x = opt_x,
@@ -368,6 +404,7 @@ if 'Random' in run_alg:
     rep_regret_list1 = []
     rep_regret_list2 = []
     for i in range(n_repeat):
+        print('repeat: ', i)
         regret_list1 = []
         regret_list2 = []
         for b in np.linspace(1, n, n):
