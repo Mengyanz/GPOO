@@ -179,11 +179,17 @@ class Base():
         # cell = node.cell
         features = []
 
+        # FIXME: CHOOSE ONE VERSION!!
+        # version 1: uniform split
         split_list = np.linspace(cell[0], cell[1], num = self.s + 1)
         for i in range(len(split_list)-1):
             features.append(self.center([split_list[i], split_list[i+1]]))
 
+        # version 2: random sample
+        # features = np.random.uniform(cell[0], cell[1], size = self.s)
+
         return np.asarray(features).reshape(self.s, self.d)
+
 
     def center(self, interval):
         """ 
@@ -233,6 +239,7 @@ class Base():
             node.parent = x
             node.depth = x.depth + 1 
             x.children.append(node)
+            self.T_dict[node] = 0
 
             self.leaves.append(node)
         self.leaves.remove(x)
@@ -246,10 +253,12 @@ class Random(Base):
     def rec(self):
         self.k = self.n
         print(self.k)
+        self.T_dict[self.root] = 0
         self.expand(self.root)
         reward = []
         for node in self.leaves:
             self.sample(node)
+            self.T_dict[node] = 1
         self.rec_node = self.evaluated_nodes[np.argmax(self.evaluated_fs)]
         return self.regret()
 
@@ -365,7 +374,11 @@ class GPOO(Base):
         # self.lengthscale = 0.1
         # self.kernel_var = 0.5
         # self.gp_noise_var = self.kernel_var * 0.05 # 1e-10 
-        self.lengthscale_bounds = [0.05, 10]
+
+        # FIXME:
+        # self.lengthscale_bounds = [0.05, 10]
+        # self.kernel_var_bounds = [0.05, 10]
+        self.lengthscale_bounds = [0.01, 10]
         self.kernel_var_bounds = [0.05, 10]
 
         # self.kernel = GPy.kern.RBF(input_dim=1, 
@@ -454,12 +467,17 @@ class GPOO(Base):
             )
         plt.legend()
         # plt.ylim(-1,2)
-        plt.savefig('reg' + str(self.sample_count) +'_'+self.reward_type+ '_opt' + str(self.opt_flag) + '.png')
+        plt.savefig('reg' + str(self.sample_count) +'_'+self.reward_type+ '_opt' + str(self.opt_flag) + '.pdf')
 
     def rec(self):
+        self.T_dict[self.root] = 0
         self.expand(self.root)
         for x in self.leaves:
             A,X,Y = self.add_obs(x)
+            self.rec_node = x 
+            regret = self.regret()
+            self.regret_list.append(regret)
+
 
         kernel = GPy.kern.RBF(input_dim=1, 
                             variance=self.kernel_var, 
@@ -662,12 +680,18 @@ def valid_plot_title(name):
 def valid_plot_filename(name):
     return name.replace(' ', '_')
 
-def plot_tree(node, ax):
-    ax.scatter(node.center, -node.depth, s=1.5, c = 'b')
+def plot_tree(node, T_dict, ax):
+    if T_dict[node] == 0:
+        c = 'b'
+    elif T_dict[node] == 1:
+        c = 'g'
+    elif T_dict[node] > 1:
+        c = 'r'
+    ax.scatter(node.center, -node.depth, s=5, c = c)
     if len(node.children) > 0:
         for child in node.children:
             ax.plot([node.center, child.center], [-node.depth, - child.depth], c = 'gray', alpha = 0.5)
-            plot_tree(child, ax)
+            plot_tree(child, T_dict, ax)
 
 def plot(arms_range, f, oo, axes, name):
     # fig, axes = plt.subplots(2, 1, figsize = (6,8), sharex=True)
@@ -680,7 +704,7 @@ def plot(arms_range, f, oo, axes, name):
     # axes[0].scatter(data, neg_depth, s = 1)
 
     axes[0].set_title(name)
-    plot_tree(oo.root, axes[0])
+    plot_tree(oo.root, oo.T_dict, axes[0])
     
     size = 1000
     x = np.linspace(arms_range[0], arms_range[1], size)
@@ -706,8 +730,8 @@ def plot(arms_range, f, oo, axes, name):
         axes[1].plot(x, mu, color = 'tab:blue', label = 'predictions')
         axes[1].fill_between(
             x.reshape(-1,), 
-            (mu + beta * std).reshape(-1,),
-            (mu - beta * std).reshape(-1,), 
+            (mu + np.sqrt(beta) * std).reshape(-1,),
+            (mu - np.sqrt(beta) * std).reshape(-1,), 
             alpha = 0.3
             )
     axes[1].legend()
@@ -722,9 +746,9 @@ def plot_two(arms_range, f, oo1, oo2, name, save_folder = ''):
 
     if hasattr(oo1, 'm'):
         assert oo1.opt_flag == oo2.opt_flag
-        plt.savefig(save_folder + valid_plot_filename(name) + '_opt' + str(oo1.opt_flag) + '.png', bbox_inches='tight')
+        plt.savefig(save_folder + valid_plot_filename(name) + '_opt' + str(oo1.opt_flag) + '.pdf', bbox_inches='tight')
     else:
-        plt.savefig(save_folder + valid_plot_filename(name) + '.png', bbox_inches='tight')
+        plt.savefig(save_folder + valid_plot_filename(name) + '.pdf', bbox_inches='tight')
 
 # def plot_three(arms_range, f, oo1, oo2, oo3, name = 'center'):
 #     fig, axes = plt.subplots(2, 3, figsize = (12,8), sharex=True)
@@ -732,7 +756,7 @@ def plot_two(arms_range, f, oo1, oo2, name, save_folder = ''):
 #     plot(arms_range, f, oo2, axes[:, 1])
 #     plot(arms_range, f, oo3, axes[:, 2])
 #     fig.suptitle(name)
-#     plt.savefig(name + '_oo.png')
+#     plt.savefig(name + '_oo.pdf')
 
 def plot_regret(regret_dict, ax, n_repeat):
     for key, regret_list in regret_dict.items():
@@ -745,17 +769,17 @@ def plot_regret(regret_dict, ax, n_repeat):
             regret_mean + regret_std,
             regret_mean - regret_std,
             alpha = 0.1)
-    ax.set_ylabel('regret')
-    ax.set_xlabel('round')
+    ax.set_ylabel('Aggregated Regret')
+    ax.set_xlabel('Budget')
     ax.set_ylim(-0.05, 1)
     ax.legend()
 
 def plot_regret_one(regret_dict, name = 'Regret', budget = 50, n_repeat = 1, save_folder = ''):
     fig, axes = plt.subplots(1, 1, figsize = (6,6))
     plot_regret(regret_dict, axes, n_repeat)
-    fig.suptitle(valid_plot_title(name))
+    # fig.suptitle(valid_plot_title(name))
     # budget = len(regret_list1[0])
-    plt.savefig(save_folder + valid_plot_filename(name) + '.png', bbox_inches='tight')
+    plt.savefig(save_folder + valid_plot_filename(name) + '.pdf', bbox_inches='tight')
 
 # def plot_regret_two(regret_dict1, regret_dict2, name = 'Regret', budget = 50, n_repeat = 1):
 #     fig, axes = plt.subplots(1, 2, figsize = (12,8), sharex=True)
@@ -763,7 +787,7 @@ def plot_regret_one(regret_dict, name = 'Regret', budget = 50, n_repeat = 1, sav
 #     plot_regret(regret_dict2, axes[1], n_repeat)
 #     fig.suptitle(valid_plot_title(name))
 #     # budget = len(regret_list1[0])
-#     plt.savefig(valid_plot_filename(name) + '.png', bbox_inches='tight')
+#     plt.savefig(valid_plot_filename(name) + '.pdf', bbox_inches='tight')
 
 
             
