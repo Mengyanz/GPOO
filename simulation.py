@@ -687,7 +687,7 @@ def plot_tree(node, T_dict, ax):
         c = 'g'
     elif T_dict[node] > 1:
         c = 'r'
-    ax.scatter(node.center, -node.depth, s=5, c = c)
+    ax.scatter(node.center, -node.depth, s=10, c = c)
     if len(node.children) > 0:
         for child in node.children:
             ax.plot([node.center, child.center], [-node.depth, - child.depth], c = 'gray', alpha = 0.5)
@@ -742,7 +742,7 @@ def plot_two(arms_range, f, oo1, oo2, name, save_folder = ''):
     fig, axes = plt.subplots(2, 2, figsize = (12,8), sharex=True)
     plot(arms_range, f, oo1, axes[:, 0], 'center')
     plot(arms_range, f, oo2, axes[:, 1], 'ave')
-    fig.suptitle(valid_plot_title(name))
+    # fig.suptitle(valid_plot_title(name))
 
     if hasattr(oo1, 'm'):
         assert oo1.opt_flag == oo2.opt_flag
@@ -759,25 +759,40 @@ def plot_two(arms_range, f, oo1, oo2, name, save_folder = ''):
 #     plt.savefig(name + '_oo.pdf')
 
 def plot_regret(regret_dict, ax, n_repeat):
+
+    linestyle_str = [
+     'solid', 'dotted', 'dashed', 'dashdot'
+     ]  
+
+    if len(regret_dict)> len(linestyle_str):
+        linestyle = 'solid'
+    i= 0
+
     for key, regret_list in regret_dict.items():
+        
+        if len(regret_dict)<=len(linestyle_str):
+            print(i)
+            linestyle = linestyle_str[i]
         regret_array = np.asarray(regret_list).reshape(n_repeat,-1)
         regret_mean = np.mean(regret_array, axis=0)
         regret_std = np.std(regret_array, axis=0)
-        ax.plot(range(1,len(regret_mean)+1), regret_mean, label = str(key))
+        ax.plot(range(1,len(regret_mean)+1), regret_mean, label = str(key), linestyle = linestyle)
         ax.fill_between(
             range(1,len(regret_mean)+1), 
             regret_mean + regret_std,
             regret_mean - regret_std,
             alpha = 0.1)
+        i+=1
     ax.set_ylabel('Aggregated Regret')
     ax.set_xlabel('Budget')
     ax.set_ylim(-0.05, 1)
     ax.legend()
 
-def plot_regret_one(regret_dict, name = 'Regret', budget = 50, n_repeat = 1, save_folder = ''):
+def plot_regret_one(regret_dict, name = 'Regret', budget = 50, n_repeat = 1, save_folder = '', plot_title = ''):
     fig, axes = plt.subplots(1, 1, figsize = (6,6))
     plot_regret(regret_dict, axes, n_repeat)
-    # fig.suptitle(valid_plot_title(name))
+    if plot_title is not '':
+        plt.title(valid_plot_title(plot_title))
     # budget = len(regret_list1[0])
     plt.savefig(save_folder + valid_plot_filename(name) + '.pdf', bbox_inches='tight')
 

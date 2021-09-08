@@ -13,6 +13,8 @@ import pandas as pd
 import xarray as xr
 import pretty_errors
 
+plt.style.use('double_col.mplstyle')
+
 #-----------------------------------------------------------------------------------
 # parameters
 
@@ -76,6 +78,8 @@ plot_tree = True
 
 if plot_regret:
     regret_dict = {}
+    regret_ave_dict = {}
+    regret_center_dict = {}
 
     for alg in ['GPOO', 'StoOO', 'Random', 'GPTree']:
     # for alg in ['GPOO']:
@@ -85,14 +89,22 @@ if plot_regret:
             with open(saved_file, 'rb') as handle:
                 data_dict = pickle.load(handle)
                 regret_dict[alg + ' Center'] = data_dict['center']
+                regret_center_dict[alg] = data_dict['center']
                 if alg != 'GPTree':
                     regret_dict[alg + ' Ave'] = data_dict['ave']
+                    regret_ave_dict[alg] = data_dict['ave']
         else:
             print('Warning: ', str(saved_file) + ' not exist. Please check.')
 
     # fig, axes = plt.subplots(1, 1, figsize = (4,8))
     plot_name = 'Regret_' + str(n) + '_' + str(n_repeat)
     plot_regret_one(regret_dict, plot_name, budget = n, n_repeat=n_repeat, save_folder=save_folder)
+
+    plot_name = 'Regret_' + str(n) + '_' + str(n_repeat) + '_center'
+    plot_regret_one(regret_center_dict, plot_name, budget = n, n_repeat=n_repeat, save_folder=save_folder, plot_title='S = 1')
+
+    plot_name = 'Regret_' + str(n) + '_' + str(n_repeat) + '_ave'
+    plot_regret_one(regret_ave_dict, plot_name, budget = n, n_repeat=n_repeat, save_folder=save_folder, plot_title='S = 10')
 
     # raise Exception
 
@@ -279,6 +291,168 @@ def construct_model_f(opt_num, my_kernel):
         X = np.array(X).reshape(-1, 1)
         Y = np.array(Y).reshape(-1,1)
 
+    if opt_num == '8':
+        # create a function that has different frequency on the left and right? I.e. wiggly on the left, very low wiggle on the right. E.g. only one wave for the high amplitude, but 10 waves for the low amplitude.
+
+        lengthscale = 0.03 # 0.05 # kernel para
+        my_kernel = GPy.kern.RBF(input_dim=d, 
+                    variance=kernel_var, 
+                    lengthscale=lengthscale)
+                    
+        r = np.random.RandomState(2021)
+        X = []
+        Y = []
+        split_list = np.linspace(arms_range[0], 0.6, num = 10)
+        for i in range(len(split_list)-1):
+            center = (split_list[i] + split_list[i+1])/2.0
+            # y = r.uniform(0.05, 0.1)
+            y = 0.5
+            X.append(center)
+            Y.append(y) # each center is assigned to a value 0~0.2
+
+            # another = r.uniform(split_list[i], split_list[i+1])
+            another = center + 2.0 * (split_list[i+1] - split_list[i])/3
+            X.append(another)
+            # Y.append(r.uniform(0.2, 0.25))
+            Y.append(0.6)
+
+        split_list = np.linspace(0.6, arms_range[1], num = 2)
+        for i in range(len(split_list)-1):
+            center = (split_list[i] + split_list[i+1])/2.0
+            # y = r.uniform(0.05, 0.1)
+            y = 0.85
+            X.append(center)
+            Y.append(y) # each center is assigned to a value 0~0.2
+
+            # another = r.uniform(split_list[i], split_list[i+1])
+            another = center + 2.0 * (split_list[i+1] - split_list[i])/3
+            if another <= arms_range[1]:
+                X.append(another)
+                # Y.append(r.uniform(0.2, 0.25))
+                Y.append(0.8)
+
+        X.append(0.7)
+        Y.append(0.6)
+        X.append(0.9)
+        Y.append(0.6)
+        X.append(0.95)
+        Y.append(0.9)
+        X = np.array(X).reshape(-1, 1)
+        Y = np.array(Y).reshape(-1,1)
+
+    if opt_num == '9':
+        # create a function that has different frequency on the left and right? I.e. wiggly on the left, very low wiggle on the right. E.g. only one wave for the high amplitude, but 10 waves for the low amplitude.
+
+        lengthscale = 0.03 # 0.05 # kernel para
+        my_kernel = GPy.kern.RBF(input_dim=d, 
+                    variance=kernel_var, 
+                    lengthscale=lengthscale)
+                    
+        r = np.random.RandomState(2021)
+        X = []
+        Y = []
+        split_list = np.linspace(arms_range[0], 0.6, num = 6)
+        for i in range(len(split_list)-1):
+            center = (split_list[i] + split_list[i+1])/2.0
+            # y = r.uniform(0.05, 0.1)
+            y = 0.5
+            X.append(center)
+            Y.append(y) # each center is assigned to a value 0~0.2
+
+            # another = r.uniform(split_list[i], split_list[i+1])
+            another = center + 2.0 * (split_list[i+1] - split_list[i])/3
+            X.append(another)
+            # Y.append(r.uniform(0.2, 0.25))
+            Y.append(0.6)
+
+        split_list = np.linspace(0.6, arms_range[1], num = 2)
+        for i in range(len(split_list)-1):
+            center = (split_list[i] + split_list[i+1])/2.0
+            # y = r.uniform(0.05, 0.1)
+            y = 0.85
+            X.append(center)
+            Y.append(y) # each center is assigned to a value 0~0.2
+
+            # another = r.uniform(split_list[i], split_list[i+1])
+            another = center + 2.0 * (split_list[i+1] - split_list[i])/3
+            if another <= arms_range[1]:
+                X.append(another)
+                # Y.append(r.uniform(0.2, 0.25))
+                Y.append(0.8)
+
+        X.append(0.0)
+        Y.append(0.4)
+        X.append(0.7)
+        Y.append(0.6)
+        X.append(0.85)
+        Y.append(0.4)
+        X.append(0.9)
+        Y.append(0.6)
+        X.append(0.95)
+        Y.append(0.95)
+        X = np.array(X).reshape(-1, 1)
+        Y = np.array(Y).reshape(-1,1)
+
+    if opt_num == '10':
+        # create a function that has different frequency on the left and right? I.e. wiggly on the left, very low wiggle on the right. E.g. only one wave for the high amplitude, but 10 waves for the low amplitude.
+
+        my_kernel = GPy.kern.RBF(input_dim=d, 
+                    variance=kernel_var, 
+                    lengthscale=0.01)\
+                    + GPy.kern.StdPeriodic(
+                        input_dim=d, 
+                        # variance=kernel_var, 
+                        lengthscale=0.2, 
+                        variance = 0.5,
+                        period=0.4
+                        # ,n_freq=10,lower=0.0, upper=0.3,active_dims=0, name=None
+                    )
+                    
+        r = np.random.RandomState(2021)
+        X = []
+        Y = []
+        split_list = np.linspace(arms_range[0], 0.6, num = 15)
+        for i in range(len(split_list)-1):
+            center = (split_list[i] + split_list[i+1])/2.0
+            # y = r.uniform(0.05, 0.1)
+            y = 0.3
+            X.append(center)
+            Y.append(y) # each center is assigned to a value 0~0.2
+
+            # another = r.uniform(split_list[i], split_list[i+1])
+            another = center + 2.0 * (split_list[i+1] - split_list[i])/3
+            X.append(another)
+            # Y.append(r.uniform(0.2, 0.25))
+            Y.append(0.4)
+
+        split_list = np.linspace(0.6, arms_range[1], num = 2)
+        for i in range(len(split_list)-1):
+            center = (split_list[i] + split_list[i+1])/2.0
+            # y = r.uniform(0.05, 0.1)
+            y = 0.4
+            X.append(center)
+            Y.append(y) # each center is assigned to a value 0~0.2
+
+            # another = r.uniform(split_list[i], split_list[i+1])
+            # another = center + 2.0 * (split_list[i+1] - split_list[i])/3
+            # if another <= arms_range[1]:
+            #     X.append(another)
+            #     # Y.append(r.uniform(0.2, 0.25))
+            #     Y.append(0.6)
+
+        X.append(0.0)
+        Y.append(0.5)
+        # X.append(0.8)
+        # Y.append(0.6)
+        # X.append(0.85)
+        # Y.append(0.35)
+        # X.append(0.9)
+        # Y.append(0.35)
+        X.append(0.95)
+        Y.append(0.55)
+        X = np.array(X).reshape(-1, 1)
+        Y = np.array(Y).reshape(-1,1)
+
     model = GPy.models.GPRegression(X,Y,my_kernel, noise_var=gp_noise_var)
 
     return model, X,Y
@@ -312,7 +486,7 @@ axes.scatter(opt_x, f(opt_x), c = 'red')
 axes.set_xlabel('Arms')
 axes.set_ylabel('Reward Function')
 axes.set_ylim(-0.05,1)
-axes.scatter(X_samples,Y_samples)
+# axes.scatter(X_samples,Y_samples)
 plt.savefig(save_folder + 'posterior_f' + str(opt_num) + '.pdf', bbox_inches='tight')
 
 # def opt_x(f, arms_range, f_type):
