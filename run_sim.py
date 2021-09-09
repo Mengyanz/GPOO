@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser(description='Run Simulation for GPOO project.')
 parser.add_argument('opt_num', type = int, help = 'choose what f to use, choices: 1,2,3')
 parser.add_argument('--n', type = int, help = 'budget (should be positive integer)')
 parser.add_argument('--r', type = int, help = 'number of repeat (should be positive integer)')
-parser.add_argument('--alg', nargs='*', help = 'please list all algorithms to run. Choices: StoOO, GPOO, GPTree, Random, SK')
+parser.add_argument('--alg', nargs='*', help = 'please list all algorithms to run. Choices: StoOO, GPOO, GPTree, Random, SK, UniRan')
 # args = parser.parse_args()
 args,_ = parser.parse_known_args()
 
@@ -81,17 +81,17 @@ if plot_regret:
     regret_ave_dict = {}
     regret_center_dict = {}
 
-    for alg in ['GPOO', 'StoOO', 'Random', 'GPTree']:
-    # for alg in ['GPOO']:
+    # for alg in ['GPOO', 'StoOO', 'Random', 'GPTree'']:
+    for alg in ['GPOO', 'StoOO', 'GPTree']:
         saved_file = save_folder + alg + '_regret_' + str(n) + '_' + str(n_repeat) + '.pickle'
 
         if os.path.isfile(saved_file):
             with open(saved_file, 'rb') as handle:
                 data_dict = pickle.load(handle)
-                regret_dict[alg + ' Center'] = data_dict['center']
+                regret_dict[alg + ' S=1'] = data_dict['center']
                 regret_center_dict[alg] = data_dict['center']
                 if alg != 'GPTree':
-                    regret_dict[alg + ' Ave'] = data_dict['ave']
+                    regret_dict[alg + ' S=10'] = data_dict['ave']
                     regret_ave_dict[alg] = data_dict['ave']
         else:
             print('Warning: ', str(saved_file) + ' not exist. Please check.')
@@ -725,6 +725,8 @@ if 'Random' in run_alg:
     with open(save_name, 'wb') as handle:
         pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
     
+if 'UniRan' in run_alg:
+    pass
 
 if 'SK' in run_alg:
     # s v.s. k v.s. regret

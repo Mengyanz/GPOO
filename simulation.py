@@ -262,6 +262,19 @@ class Random(Base):
         self.rec_node = self.evaluated_nodes[np.argmax(self.evaluated_fs)]
         return self.regret()
 
+class UniRan(Base):
+    """Uniform Random.
+    At each round, uniformly sample one arm from the arm space, 
+    recommend the highest reward in history. 
+    """
+    def rec(self):
+        for i in range(self.n):
+            select_node = np.random.uniform(self.root[0], self.root[1])
+            self.sample(select_node)
+        
+        self.rec_node = self.evaluated_nodes[np.argmax(self.evaluated_fs)]
+        return self.regret()
+
 class DOO(Base):
     """Implementation of Deterministic Optimistic Optimisation algorithm 
     http://www.nowpublishers.com/articles/foundations-and-trends-in-machine-learning/MAL-038
@@ -760,29 +773,54 @@ def plot_two(arms_range, f, oo1, oo2, name, save_folder = ''):
 
 def plot_regret(regret_dict, ax, n_repeat):
 
-    linestyle_str = [
-     'solid', 'dotted', 'dashed', 'dashdot'
-     ]  
+    color_dict = {}
+    linestyle_dict = {}
 
-    if len(regret_dict)> len(linestyle_str):
-        linestyle = 'solid'
-    i= 0
+    color_dict['GPOO S=1'] = 'tab:blue'
+    color_dict['StoOO S=1'] = 'tab:orange'
+    color_dict['GPTree S=1'] = 'tab:purple'
+    color_dict['GPOO S=10'] = 'tab:brown'
+    color_dict['StoOO S=10'] = 'tab:pink'
+
+    color_dict['GPOO'] = 'tab:blue'
+    color_dict['StoOO'] = 'tab:orange'
+    color_dict['GPTree'] = 'tab:purple'
+    # color_dict['Random'] = 'tab:green'
+
+    # linestyle_dict['S=1'] = 'solid'
+    # linestyle_dict['S=10'] = 'solid'
+
+    # linestyle_str = [
+    #  'solid', 'dotted', 'dashed', 'dashdot'
+    #  ]  
+
+    # if len(regret_dict)> len(linestyle_str):
+    #     linestyle = 'solid'
+    # i= 0
 
     for key, regret_list in regret_dict.items():
         
-        if len(regret_dict)<=len(linestyle_str):
-            print(i)
-            linestyle = linestyle_str[i]
+        # if len(regret_dict)<=len(linestyle_str):
+        #     print(i)
+        #     linestyle = linestyle_str[i]
+        # if ' ' in key:
+        #     alg, s = key.split(' ')
+        # else: 
+        #     alg = key
+        #     s = 'S=1'
         regret_array = np.asarray(regret_list).reshape(n_repeat,-1)
         regret_mean = np.mean(regret_array, axis=0)
         regret_std = np.std(regret_array, axis=0)
-        ax.plot(range(1,len(regret_mean)+1), regret_mean, label = str(key), linestyle = linestyle)
+        ax.plot(range(1,len(regret_mean)+1), regret_mean, label = str(key), color = color_dict[key]
+        # , linestyle = linestyle_dict[s]
+        )
         ax.fill_between(
             range(1,len(regret_mean)+1), 
             regret_mean + regret_std,
             regret_mean - regret_std,
+            color = color_dict[key],
             alpha = 0.1)
-        i+=1
+        # i+=1
     ax.set_ylabel('Aggregated Regret')
     ax.set_xlabel('Budget')
     ax.set_ylim(-0.05, 1)
