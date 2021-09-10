@@ -30,7 +30,7 @@ opt_num = str(args.opt_num)
 save_folder = 'GPOO_results' + opt_num + '/'
 
 if not os.path.exists(save_folder):
-    os.makedirs(save_folder)
+    os.makedirs(save_folder)
 
 # np.random.seed(2021)
 if args.n is not None:
@@ -415,6 +415,8 @@ if 'SK' in run_alg:
     
         xr_data = xr.DataArray(np.log(df))
         xr_data.plot()
+        plt.title('N='+str(n))
+        # plt.clim(-2.25,-0.05)
         plt.xticks(k_list)
         plt.yticks(s_list)
         plt.savefig(save_folder + 'SK_regret_' + str(n) + '.pdf')
