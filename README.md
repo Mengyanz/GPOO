@@ -28,5 +28,5 @@ optional arguments:
 Here is an example of usage:
 to run GPOO algorithm with function choice 1, with budget 80, 30 independent runs: 
 ```
-python run_sim.py 1 -n 80 -r 30 -alg GPOO
+python run_sim.py 1 --n 80 --r 30 --alg GPOO
 ```
