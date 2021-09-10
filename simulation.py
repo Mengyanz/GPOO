@@ -262,51 +262,6 @@ class Random(Base):
         self.rec_node = self.evaluated_nodes[np.argmax(self.evaluated_fs)]
         return self.regret()
 
-class UniRan(Base):
-    """Uniform Random.
-    At each round, uniformly sample one arm from the arm space, 
-    recommend the highest reward in history. 
-    """
-    def rec(self):
-        for i in range(self.n):
-            select_node = np.random.uniform(self.root[0], self.root[1])
-            self.sample(select_node)
-        
-        self.rec_node = self.evaluated_nodes[np.argmax(self.evaluated_fs)]
-        return self.regret()
-
-class DOO(Base):
-    """Implementation of Deterministic Optimistic Optimisation algorithm 
-    http://www.nowpublishers.com/articles/foundations-and-trends-in-machine-learning/MAL-038
-    Fig 3.6 
-    """
-   
-    def bvalue(self, x):
-        """
-            Return bvalue of tree node x
-        """
-        reward = self.reward(x)
-        self.evaluated_nodes.append(x)
-        self.evaluated_fs.append(reward)
-        return reward + self.delta(x.depth)
-    
-    def rec(self):
-        assert (self.sigma - 0.0) < 1e-5 # no noise
-
-        sample_count = 0 
-        while sample_count < self.n: # change n to sample budget
-        # for i in range(self.n):
-            for x in self.leaves:
-                if x not in self.evaluated_nodes:
-                    self.bvalues[x] = self.bvalue(x)
-                    sample_count += 1
-                    
-            selected_node = max(self.bvalues, key = self.bvalues.get)
-            del self.bvalues[selected_node]
-            self.expand(selected_node)
-
-        return self.evaluated_nodes[np.argmax(self.evaluated_fs)]
-
 class StoOO(Base):
     """
     Implementation of Stochastic Optimistic Optimisation algorithm 
@@ -369,11 +324,6 @@ class GPOO(Base):
     """
     We extend StoOO to the case where f is sampled from GP. 
 
-    Parameter
-    ---------------------------------------------
-    kernel: GPy.kern instance. Default is RBF kernel. 
-    # TODO: extend to support other kernels.
-
     """
     def __init__(self, f, delta, root_cell, n, k=2, d=1, s=1, reward_type = 'center', sigma = 0.1, opt_x = None, hmax = 4, **kwarg) -> None:
         super().__init__(f, delta, root_cell, n, k, d, s, reward_type, sigma, opt_x)
@@ -388,7 +338,6 @@ class GPOO(Base):
         # self.kernel_var = 0.5
         # self.gp_noise_var = self.kernel_var * 0.05 # 1e-10 
 
-        # FIXME:
         # self.lengthscale_bounds = [0.05, 10]
         # self.kernel_var_bounds = [0.05, 10]
         self.lengthscale_bounds = [0.01, 10]
@@ -412,7 +361,6 @@ class GPOO(Base):
             raise Exception
 
     def beta(self,t = 1):
-        # TODO: need to change (based on theo analysis)
         # return 0.5 * np.log(t)
         return 0.1 * np.log(np.pi**2 * t**2/(6 * 0.1))
         # return 1
@@ -521,7 +469,6 @@ class GPOO(Base):
             if self.delta(selected_node.depth) >= self.threshold(selected_node) and selected_node.depth <= self.hmax:
             # if self.T_dict[selected_node] >= self.threshold(selected_node):
                 del self.bvalues[selected_node]
-                # FIXME: need to fix the case where there is more than one nodes in the deepest depth
                 if selected_node.depth > self.rec_node.depth:
                     self.rec_node = selected_node
                 elif selected_node.depth == self.rec_node.depth:
@@ -700,7 +647,7 @@ def plot_tree(node, T_dict, ax):
         c = 'g'
     elif T_dict[node] > 1:
         c = 'r'
-    ax.scatter(node.center, -node.depth, s=10, c = c)
+    ax.scatter(node.center, -node.depth, s=20, c = c)
     if len(node.children) > 0:
         for child in node.children:
             ax.plot([node.center, child.center], [-node.depth, - child.depth], c = 'gray', alpha = 0.5)
@@ -753,8 +700,8 @@ def plot(arms_range, f, oo, axes, name):
 
 def plot_two(arms_range, f, oo1, oo2, name, save_folder = ''):
     fig, axes = plt.subplots(2, 2, figsize = (12,8), sharex=True)
-    plot(arms_range, f, oo1, axes[:, 0], 'center')
-    plot(arms_range, f, oo2, axes[:, 1], 'ave')
+    plot(arms_range, f, oo1, axes[:, 0], 'S=1')
+    plot(arms_range, f, oo2, axes[:, 1], 'S=10')
     # fig.suptitle(valid_plot_title(name))
 
     if hasattr(oo1, 'm'):

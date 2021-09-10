@@ -22,12 +22,15 @@ parser = argparse.ArgumentParser(description='Run Simulation for GPOO project.')
 parser.add_argument('opt_num', type = int, help = 'choose what f to use, choices: 1,2,3')
 parser.add_argument('--n', type = int, help = 'budget (should be positive integer)')
 parser.add_argument('--r', type = int, help = 'number of repeat (should be positive integer)')
-parser.add_argument('--alg', nargs='*', help = 'please list all algorithms to run. Choices: StoOO, GPOO, GPTree, Random, SK, UniRan')
+parser.add_argument('--alg', nargs='*', help = 'please list all algorithms to run. Choices: StoOO, GPOO, GPTree, Random, SK')
 # args = parser.parse_args()
 args,_ = parser.parse_known_args()
 
 opt_num = str(args.opt_num) 
 save_folder = 'GPOO_results' + opt_num + '/'
+
+if not os.path.exists(save_folder):
+    os.makedirs(save_folder)
 
 # np.random.seed(2021)
 if args.n is not None:
@@ -100,13 +103,11 @@ if plot_regret:
     plot_name = 'Regret_' + str(n) + '_' + str(n_repeat)
     plot_regret_one(regret_dict, plot_name, budget = n, n_repeat=n_repeat, save_folder=save_folder)
 
-    plot_name = 'Regret_' + str(n) + '_' + str(n_repeat) + '_center'
-    plot_regret_one(regret_center_dict, plot_name, budget = n, n_repeat=n_repeat, save_folder=save_folder, plot_title='S = 1')
+    # plot_name = 'Regret_' + str(n) + '_' + str(n_repeat) + '_center'
+    # plot_regret_one(regret_center_dict, plot_name, budget = n, n_repeat=n_repeat, save_folder=save_folder, plot_title='S = 1')
 
-    plot_name = 'Regret_' + str(n) + '_' + str(n_repeat) + '_ave'
-    plot_regret_one(regret_ave_dict, plot_name, budget = n, n_repeat=n_repeat, save_folder=save_folder, plot_title='S = 10')
-
-    # raise Exception
+    # plot_name = 'Regret_' + str(n) + '_' + str(n_repeat) + '_ave'
+    # plot_regret_one(regret_ave_dict, plot_name, budget = n, n_repeat=n_repeat, save_folder=save_folder, plot_title='S = 10')
 
 # -------------------------------------------------------------------------------
 # function and delta
@@ -118,7 +119,6 @@ def construct_model_f(opt_num, my_kernel):
     """Generate unknown f to be optimised by 
     posterior of a the known GP
     """
-    size = 1
 
     # X = np.random.uniform(0, 1., (sample_size, 1))
     # Y = np.sin(X) + np.random.randn(sample_size, 1)*0.05
@@ -133,37 +133,8 @@ def construct_model_f(opt_num, my_kernel):
                     variance=kernel_var, 
                     lengthscale=0.1)
 
-    # option 2:
-    if opt_num == '2':
-        sample_size = 9
-        X = np.array([0.05, 0.2, 0.3, 0.4, 0.5, 0.65, 0.75, 0.9, 0.95]).reshape(sample_size,1)
-        Y = np.array([0.1, 0.3, 0.15, 0.35, 0.12, 0.85, 0.05, 0.98, 0.3]).reshape(sample_size,1)
-
-    # option 3:
-    if opt_num == '3':
-        np.random.seed(2021)
-        sample_size = 9
-        X = []
-        Y = []
-        split_list = np.linspace(arms_range[0], arms_range[1], num = 9)
-        for i in range(len(split_list)-1):
-            center = (split_list[i] + split_list[i+1])/2.0
-            y = np.random.uniform(0.0, 0.2)
-            X.append(center)
-            Y.append(y) # each center is assigned to a value 0~0.2
-
-            another = np.random.uniform(split_list[i], split_list[i+1])
-            X.append(another)
-            Y.append(np.random.uniform(0.4, 0.6))
-
-        X.append(0.9)
-        Y.append(0.9)
-        X = np.array(X).reshape(-1, 1)
-        Y = np.array(Y).reshape(-1,1)
-        plt.scatter(X,Y)
-
     # option 4
-    if opt_num == '4':
+    if opt_num == '2':
         # create a function that has different frequency on the left and right? I.e. wiggly on the left, very low wiggle on the right. E.g. only one wave for the high amplitude, but 10 waves for the low amplitude.
 
         r = np.random.RandomState(2021)
@@ -188,40 +159,8 @@ def construct_model_f(opt_num, my_kernel):
         X = np.array(X).reshape(-1, 1)
         Y = np.array(Y).reshape(-1,1)
 
-    # option 5
-    if opt_num == '5':
-        # construct tree with level hmax = 4, and put each node's representative point (center) to be low values. And run GPOO with the same hmax
-        # grid splitting the arm range, and pick relatively low values for center and relatively high values for others points
-        print(opt_num)
-        tree_level = 4
-        X = []
-        Y = []
-
-        for l in range(1, tree_level+2): # l: 1...tree_level
-            split_list = np.linspace(arms_range[0], arms_range[1], num = l)
-            for i in range(len(split_list)-1):
-                center = (split_list[i] + split_list[i+1])/2.0
-                print(center)
-                X.append(center)
-                Y.append(0.1)
-
-                # if l == tree_level:
-                    # another = center + 1.0 * (split_list[i+1] - split_list[i])/2
-                    # X.append(another)
-                    # Y.append(r.uniform(0.2, 0.25))
-                    # Y.append(0.3)
-                X.append(split_list[i])
-                Y.append(0.3)
-                X.append(split_list[i+1])
-                Y.append(0.3)
-
-
-        X.append(0.95)
-        Y.append(0.5)
-        X = np.array(X).reshape(-1, 1)
-        Y = np.array(Y).reshape(-1,1)
-
-    if opt_num == '6':
+    # option 6
+    if opt_num == '3':
         # create a function that has different frequency on the left and right? I.e. wiggly on the left, very low wiggle on the right. E.g. only one wave for the high amplitude, but 10 waves for the low amplitude.
         
         lengthscale = 0.01 # 0.05 # kernel para
@@ -253,203 +192,6 @@ def construct_model_f(opt_num, my_kernel):
         Y.append(0.2)
         X.append(0.95)
         Y.append(0.9)
-        X = np.array(X).reshape(-1, 1)
-        Y = np.array(Y).reshape(-1,1)
-
-    if opt_num == '7':
-        # If you make the amplitudes increase from left to right, then your regret plot won't suddenly decrease like that.
-        
-        lengthscale = 0.02 # 0.05 # kernel para
-        my_kernel = GPy.kern.RBF(input_dim=d, 
-                    variance=kernel_var, 
-                    lengthscale=lengthscale)
-
-        r = np.random.RandomState(2021)
-        sample_size = 9
-        X = []
-        Y = []
-        split_list = np.linspace(arms_range[0], 0.9, num = 10)
-        for i in range(len(split_list)-1):
-            center = (split_list[i] + split_list[i+1])/2.0
-            # y = r.uniform(0.05, 0.1)
-            y = 0.1
-            X.append(center)
-            Y.append(center/2.0) # each center is assigned to a value 0~0.2
-
-            # another = r.uniform(split_list[i], split_list[i+1])
-            another = center + 2.0 * (split_list[i+1] - split_list[i])/3
-            X.append(another)
-            # Y.append(r.uniform(0.2, 0.25))
-            Y.append((center + 0.1)/2.0)
-
-        # X.append(0.94)
-        # Y.append(0.5)
-        # X.append(0.945)
-        # Y.append(0.6)
-        X.append(0.95)
-        Y.append(0.8)
-        X = np.array(X).reshape(-1, 1)
-        Y = np.array(Y).reshape(-1,1)
-
-    if opt_num == '8':
-        # create a function that has different frequency on the left and right? I.e. wiggly on the left, very low wiggle on the right. E.g. only one wave for the high amplitude, but 10 waves for the low amplitude.
-
-        lengthscale = 0.03 # 0.05 # kernel para
-        my_kernel = GPy.kern.RBF(input_dim=d, 
-                    variance=kernel_var, 
-                    lengthscale=lengthscale)
-                    
-        r = np.random.RandomState(2021)
-        X = []
-        Y = []
-        split_list = np.linspace(arms_range[0], 0.6, num = 10)
-        for i in range(len(split_list)-1):
-            center = (split_list[i] + split_list[i+1])/2.0
-            # y = r.uniform(0.05, 0.1)
-            y = 0.5
-            X.append(center)
-            Y.append(y) # each center is assigned to a value 0~0.2
-
-            # another = r.uniform(split_list[i], split_list[i+1])
-            another = center + 2.0 * (split_list[i+1] - split_list[i])/3
-            X.append(another)
-            # Y.append(r.uniform(0.2, 0.25))
-            Y.append(0.6)
-
-        split_list = np.linspace(0.6, arms_range[1], num = 2)
-        for i in range(len(split_list)-1):
-            center = (split_list[i] + split_list[i+1])/2.0
-            # y = r.uniform(0.05, 0.1)
-            y = 0.85
-            X.append(center)
-            Y.append(y) # each center is assigned to a value 0~0.2
-
-            # another = r.uniform(split_list[i], split_list[i+1])
-            another = center + 2.0 * (split_list[i+1] - split_list[i])/3
-            if another <= arms_range[1]:
-                X.append(another)
-                # Y.append(r.uniform(0.2, 0.25))
-                Y.append(0.8)
-
-        X.append(0.7)
-        Y.append(0.6)
-        X.append(0.9)
-        Y.append(0.6)
-        X.append(0.95)
-        Y.append(0.9)
-        X = np.array(X).reshape(-1, 1)
-        Y = np.array(Y).reshape(-1,1)
-
-    if opt_num == '9':
-        # create a function that has different frequency on the left and right? I.e. wiggly on the left, very low wiggle on the right. E.g. only one wave for the high amplitude, but 10 waves for the low amplitude.
-
-        lengthscale = 0.03 # 0.05 # kernel para
-        my_kernel = GPy.kern.RBF(input_dim=d, 
-                    variance=kernel_var, 
-                    lengthscale=lengthscale)
-                    
-        r = np.random.RandomState(2021)
-        X = []
-        Y = []
-        split_list = np.linspace(arms_range[0], 0.6, num = 6)
-        for i in range(len(split_list)-1):
-            center = (split_list[i] + split_list[i+1])/2.0
-            # y = r.uniform(0.05, 0.1)
-            y = 0.5
-            X.append(center)
-            Y.append(y) # each center is assigned to a value 0~0.2
-
-            # another = r.uniform(split_list[i], split_list[i+1])
-            another = center + 2.0 * (split_list[i+1] - split_list[i])/3
-            X.append(another)
-            # Y.append(r.uniform(0.2, 0.25))
-            Y.append(0.6)
-
-        split_list = np.linspace(0.6, arms_range[1], num = 2)
-        for i in range(len(split_list)-1):
-            center = (split_list[i] + split_list[i+1])/2.0
-            # y = r.uniform(0.05, 0.1)
-            y = 0.85
-            X.append(center)
-            Y.append(y) # each center is assigned to a value 0~0.2
-
-            # another = r.uniform(split_list[i], split_list[i+1])
-            another = center + 2.0 * (split_list[i+1] - split_list[i])/3
-            if another <= arms_range[1]:
-                X.append(another)
-                # Y.append(r.uniform(0.2, 0.25))
-                Y.append(0.8)
-
-        X.append(0.0)
-        Y.append(0.4)
-        X.append(0.7)
-        Y.append(0.6)
-        X.append(0.85)
-        Y.append(0.4)
-        X.append(0.9)
-        Y.append(0.6)
-        X.append(0.95)
-        Y.append(0.95)
-        X = np.array(X).reshape(-1, 1)
-        Y = np.array(Y).reshape(-1,1)
-
-    if opt_num == '10':
-        # create a function that has different frequency on the left and right? I.e. wiggly on the left, very low wiggle on the right. E.g. only one wave for the high amplitude, but 10 waves for the low amplitude.
-
-        my_kernel = GPy.kern.RBF(input_dim=d, 
-                    variance=kernel_var, 
-                    lengthscale=0.01)\
-                    + GPy.kern.StdPeriodic(
-                        input_dim=d, 
-                        # variance=kernel_var, 
-                        lengthscale=0.2, 
-                        variance = 0.5,
-                        period=0.4
-                        # ,n_freq=10,lower=0.0, upper=0.3,active_dims=0, name=None
-                    )
-                    
-        r = np.random.RandomState(2021)
-        X = []
-        Y = []
-        split_list = np.linspace(arms_range[0], 0.6, num = 15)
-        for i in range(len(split_list)-1):
-            center = (split_list[i] + split_list[i+1])/2.0
-            # y = r.uniform(0.05, 0.1)
-            y = 0.3
-            X.append(center)
-            Y.append(y) # each center is assigned to a value 0~0.2
-
-            # another = r.uniform(split_list[i], split_list[i+1])
-            another = center + 2.0 * (split_list[i+1] - split_list[i])/3
-            X.append(another)
-            # Y.append(r.uniform(0.2, 0.25))
-            Y.append(0.4)
-
-        split_list = np.linspace(0.6, arms_range[1], num = 2)
-        for i in range(len(split_list)-1):
-            center = (split_list[i] + split_list[i+1])/2.0
-            # y = r.uniform(0.05, 0.1)
-            y = 0.4
-            X.append(center)
-            Y.append(y) # each center is assigned to a value 0~0.2
-
-            # another = r.uniform(split_list[i], split_list[i+1])
-            # another = center + 2.0 * (split_list[i+1] - split_list[i])/3
-            # if another <= arms_range[1]:
-            #     X.append(another)
-            #     # Y.append(r.uniform(0.2, 0.25))
-            #     Y.append(0.6)
-
-        X.append(0.0)
-        Y.append(0.5)
-        # X.append(0.8)
-        # Y.append(0.6)
-        # X.append(0.85)
-        # Y.append(0.35)
-        # X.append(0.9)
-        # Y.append(0.35)
-        X.append(0.95)
-        Y.append(0.55)
         X = np.array(X).reshape(-1, 1)
         Y = np.array(Y).reshape(-1,1)
 
@@ -489,20 +231,6 @@ axes.set_ylim(-0.05,1)
 # axes.scatter(X_samples,Y_samples)
 plt.savefig(save_folder + 'posterior_f' + str(opt_num) + '.pdf', bbox_inches='tight')
 
-# def opt_x(f, arms_range, f_type):
-#     size = 1000
-    
-#     x = np.linspace(arms_range[0], arms_range[1], size)
-#     if f_type == 'gp':
-#         x = x.reshape(-1,1)
-#         f_list = f(x)
-#     else:
-#         f_list = []
-#         for i in x:
-#             f_list.append(f(x))
-
-#     # REVIEW: we assume there is an unique opt point
-#     return np.argmax(f_list)
     
 def delta1(h):
     # return 14.0 * 2**(-h)
@@ -517,57 +245,6 @@ def delta2(h):
 opt_x = get_opt_x(f, arms_range)
 print('opt_x: ', opt_x)
 print('opt f: ', f(opt_x))
-
-if 'DOO' in run_alg:
-    # FIXME: not updated
-
-    doo1 = DOO(f=f, delta = delta1, root_cell = arms_range, n = n, k=k, reward_type=reward_type)
-
-    rec_node1 = doo1.rec()
-    print(rec_node1.features)
-    print(rec_node1.depth)
-    # print([node.features for node in doo1.evaluated_nodes])
-    # print(doo1.evaluated_fs)
-    # print()
-
-    doo2 = DOO(f=f, delta = delta1, root_cell = arms_range, n = n, k=k, s=10, reward_type='ave')
-    # doo2 = DOO(arms_range, f, delta2, k, n, reward_type)
-
-    rec_node2 = doo2.rec()
-    print(rec_node2.features)
-    print(rec_node2.depth)
-    # print(node.features for node in doo2.evaluated_nodes)
-    # print(doo2.evaluated_fs)
-
-    diff_node = []
-    diff_f = []
-    for i, node1 in enumerate(doo1.evaluated_nodes):
-        for j, node2 in enumerate(doo2.evaluated_nodes):
-            if node1.cell[0] == node2.cell[0] and node1.cell[1] == node2.cell[1]:
-                # print('i: ', i)
-                # print('j:', j)
-                # assert node1.features - node2.features < 1e-3
-                diff_node.append(node1.features)
-                diff_f.append(np.abs(doo1.evaluated_fs[i] - doo2.evaluated_fs[j]))
-                # diff_dict[node1.features] = 
-                break
-                
-
-    print(len(doo1.evaluated_fs))
-    print(len(doo2.evaluated_fs))
-
-    # sanity check: Is the reward at the center the same as the average reward? Could be some scaling, but let's ignore that.
-    # Scaling may not change the choice of arm, even if the rewards are different.
-
-    plt.scatter(diff_node, diff_f, c = range(len(diff_node)))
-    plt.colorbar()
-    plt.xlabel('x')
-    plt.ylabel('|center reward - ave reward|')
-    plt.savefig('group_bandits/diff.pdf')
-
-    # plot(arms_range, f, doo1, 'doo1')
-    # plot(arms_range, f, doo2, 'doo2')
-    plot_two(arms_range, f, doo1, doo2, 'center v.s. ave')
 
 if 'StoOO' in run_alg:
     eta = 0.1
@@ -604,8 +281,7 @@ if 'StoOO' in run_alg:
     
     save_name = save_folder + 'StoOO_regret_' + str(n) + '_' + str(n_repeat) + '.pickle'
     with open(save_name, 'wb') as handle:
-        pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        
+        pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)      
 
 if 'GPOO' in run_alg:
     rep_regret_list1 = []
@@ -724,9 +400,6 @@ if 'Random' in run_alg:
     save_name = save_folder + 'Random_regret_' + str(n) + '_' + str(n_repeat) + '.pickle'
     with open(save_name, 'wb') as handle:
         pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    
-if 'UniRan' in run_alg:
-    pass
 
 if 'SK' in run_alg:
     # s v.s. k v.s. regret
@@ -777,52 +450,4 @@ if 'SK' in run_alg:
         saved_whole_file = save_folder + 'SK_whole_regret_' + str(n) + '_' + str(n_repeat) + '.pickle'
         with open(saved_whole_file, 'wb') as handle:
             pickle.dump(regret_whole_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    
-    
-
-
-    
-
-
-# print('ave:')
-# print('regret: ', regret_gpoo2)
-# print(gpoo2.rec_node.features)
-# print(gpoo2.rec_node.depth)
-
-# print(node.features for node in doo2.evaluated_nodes)
-# print(doo2.evaluated_fs)
-        
-# print(len(gpoo1.evaluated_fs))
-# print(len(gpoo2.evaluated_fs))
-
-
-# plot(arms_range, f, doo1, 'doo1')
-# plot(arms_range, f, doo2, 'doo2')
-# plot_regret_two(regret_gpoo1, regret_gpoo2, 'GPOO center v.s. ave')
-# plot_two(arms_range, gpoo1.f, gpoo1, gpoo2, 'GPOO center v.s. ave')
-
-
-
-
-# sto2 = StoOO(arms_range, f, delta1, k, n, reward_type, eta)
-
-# rec_sto2 = sto2.rec()
-# print(rec_sto2.features)
-# print(rec_sto2.depth)
-
-# sto3 = GPTree(arms_range, f, delta1, k, n, reward_type, eta)
-
-# rec_sto3 = sto3.rec()
-# print(rec_sto3.features)
-# print(rec_sto3.depth)
-        
-# print(len(sto1.evaluated_fs))
-# print(len(sto2.evaluated_fs))
-# print(len(sto3.evaluated_fs))
-
-
-# # plot(arms_range, f, doo1, 'doo1')
-# # plot(arms_range, f, doo2, 'doo2')
-# plot_three(arms_range, f, sto1, sto2, sto3, 'GPOO v.s. StoOO v.s. GPTree (center)')
-
     
