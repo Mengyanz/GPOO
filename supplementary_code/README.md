@@ -1,6 +1,7 @@
 # Supplementary Code for Gaussian Process Bandits with Aggregated Feedback
 
 We provide the implementation for our algorithm Gaussian Process Optimistic Optimisation (GPOO) and related algorithms. 
+Full paper (including appendix) can be found [here](https://arxiv.org/abs/2112.13029).
 
 ## Usage
 
@@ -29,4 +30,14 @@ Here is an example of usage:
 to run GPOO algorithm with function choice 1, with budget 80, 30 independent runs: 
 ```
 python run_sim.py 1 --n 80 --r 30 --alg GPOO
+```
+
+Cite us by
+```
+@article{zhang2022GPOO,
+  title={Gaussian Process Bandits with Aggregated Feedback},
+  author={Zhang, Mengyan and Tsuchida, Russell and Ong, Cheng Soon},
+  journal={Proceedings of the AAAI Conference on Artificial Intelligence},
+  year={2022}
+}
 ```
